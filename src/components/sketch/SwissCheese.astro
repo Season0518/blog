@@ -1,0 +1,339 @@
+---
+import rough from "roughjs";
+import Sketch from "./Sketch.astro";
+import {
+  BALL_R,
+  COUNTER_X,
+  FEEDBACK,
+  HEIGHT,
+  HUMAN_MARKER,
+  WIDTH,
+  counters,
+  shapes,
+} from "./swissCheese";
+
+const generator = rough.generator();
+const ball = generator
+  .circle(0, 0, BALL_R * 2, {
+    roughness: 0.9,
+    strokeWidth: 1.4,
+    fill: "ball",
+    fillStyle: "solid",
+    seed: 7,
+  })
+  .sets.map(set => ({
+    d: generator.opsToPath(set, 2),
+    kind: set.type === "path" ? "outline" : "core",
+  }));
+---
+
+<div data-swiss-cheese>
+  <Sketch
+    width={WIDTH}
+    height={HEIGHT}
+    title="Four imperfect defenses in GitHub Flow: local checks catch mistakes before push, required CI runs tests and builds, AI review finds bugs, and human approval decides whether to ship. Requested changes return to checks. Problems that escape all four defenses reach fast fallback through revert or redeployment."
+    caption="一个典型的发布流水线"
+    shapes={shapes}
+  >
+    <g slot="overlay" aria-hidden="true">
+      <g
+        class="human-marker"
+        transform={`translate(${HUMAN_MARKER[0]} ${HUMAN_MARKER[1]})`}
+      >
+        <circle r="5"></circle>
+        <path d="M-10 20 Q-10 8 0 8 Q10 8 10 20"></path>
+      </g>
+      <text
+        class="human-feedback-label"
+        text-anchor="middle"
+        transform={`translate(${FEEDBACK.x - 12} ${(FEEDBACK.from + FEEDBACK.to) / 2}) rotate(-90)`}
+      >
+        Revise
+      </text>
+      {
+        counters.map(counter => (
+          <text
+            class="sketch-badge"
+            x={COUNTER_X}
+            y={counter.y}
+            text-anchor="end"
+            data-counter={counter.id}
+          />
+        ))
+      }
+      <g data-balls></g>
+      <g class="ball" display="none" data-ball-template>
+        {ball.map(path => <path d={path.d} class={path.kind} />)}
+      </g>
+    </g>
+  </Sketch>
+</div>
+
+<style>
+  [data-swiss-cheese] :global(g[data-id^="human-"]) {
+    --state-color: var(--sketch-block);
+  }
+
+  [data-swiss-cheese] :global(g[data-id^="human-"] .stroke),
+  [data-swiss-cheese] :global(g[data-id^="human-"] .hatch) {
+    stroke: var(--sketch-block);
+  }
+
+  [data-swiss-cheese] :global(g[data-id^="human-"] text),
+  [data-swiss-cheese] :global([data-counter="human-approval"]),
+  .human-feedback-label {
+    fill: var(--sketch-block);
+  }
+
+  .human-marker {
+    fill: none;
+    stroke: var(--sketch-block);
+    stroke-width: 1.6;
+  }
+
+  .human-feedback-label {
+    font-size: 16px;
+  }
+
+  [data-swiss-cheese] :global(g[data-shape="slab"] text + text) {
+    font-size: 14px;
+  }
+
+  .ball .core {
+    fill: var(--sketch-warn);
+  }
+
+  .ball .outline {
+    fill: none;
+    stroke: currentColor;
+  }
+</style>
+
+<script>
+  import {
+    GRAVITY,
+    NET,
+    SPAWN_Y,
+    counters,
+    plan,
+    restY,
+    slabs,
+    type Drop,
+  } from "./swissCheese";
+
+  const SPAWN_MS = 520;
+  const REST_MS = 900;
+  const FADE_MS = 450;
+  const FLASH_MS = 380;
+  const PAUSE_MS = 2600;
+  const MAX_DT = 50;
+
+  type Ball = Drop & {
+    el: SVGGElement;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    t: number;
+    phase: "fall" | "bounce" | "rest";
+  };
+
+  const cleanups = new Set<() => void>();
+
+  function setup(root: HTMLElement) {
+    if (root.dataset.ready) return;
+    root.dataset.ready = "true";
+
+    const svg = root.querySelector("svg")!;
+    const layer = svg.querySelector<SVGGElement>("[data-balls]")!;
+    const template = svg.querySelector<SVGGElement>("[data-ball-template]")!;
+    const groups = new Map(
+      [...svg.querySelectorAll<SVGGElement>("g[data-id]")].map(g => [
+        g.dataset.id!,
+        g,
+      ])
+    );
+    const labels = new Map(
+      counters.map(({ id, verb }) => [
+        id,
+        {
+          verb,
+          el: svg.querySelector<SVGTextElement>(`[data-counter="${id}"]`)!,
+        },
+      ])
+    );
+    const ids = [...slabs.map(slab => slab.id), NET.id];
+    const counts = new Map<string, number>();
+
+    const render = (ball: Ball) => {
+      ball.el.setAttribute("transform", `translate(${ball.x} ${ball.y})`);
+    };
+
+    const spawn = (drop: Drop) => {
+      const el = template.cloneNode(true) as SVGGElement;
+      el.removeAttribute("display");
+      el.removeAttribute("data-ball-template");
+      layer.append(el);
+      const ball: Ball = {
+        ...drop,
+        el,
+        x: drop.x0,
+        y: SPAWN_Y,
+        vx: drop.vx,
+        vy: 0,
+        t: 0,
+        phase: "fall",
+      };
+      render(ball);
+      return ball;
+    };
+
+    const count = (id: string) => {
+      const n = (counts.get(id) ?? 0) + 1;
+      counts.set(id, n);
+      const label = labels.get(id)!;
+      label.el.textContent = `${label.verb} ${n}`;
+    };
+
+    const resetCounts = () => {
+      counts.clear();
+      labels.forEach(({ el }) => (el.textContent = ""));
+    };
+
+    const flashTimers = new Map<string, number>();
+    const flash = (id: string) => {
+      const g = groups.get(id)!;
+      g.dataset.state = "active";
+      clearTimeout(flashTimers.get(id));
+      flashTimers.set(
+        id,
+        window.setTimeout(() => g.removeAttribute("data-state"), FLASH_MS)
+      );
+      if (id === NET.id) {
+        g.animate(
+          [
+            { transform: "none" },
+            { transform: "translateY(5px)" },
+            { transform: "none" },
+          ],
+          { duration: 420, easing: "ease-out" }
+        );
+      }
+    };
+
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduceMotion.matches) {
+      for (const drop of plan()) {
+        const ball = spawn(drop);
+        Object.assign(ball, drop.fate);
+        render(ball);
+        count(ids[drop.fate.depth]);
+      }
+      return;
+    }
+
+    let drops = plan();
+    let balls: Ball[] = [];
+    let clock = 0;
+    let next = 0;
+    let start = 0;
+
+    const step = (dt: number) => {
+      clock += dt;
+      if (next < drops.length && clock >= start + next * SPAWN_MS) {
+        if (next === 0) resetCounts();
+        balls.push(spawn(drops[next++]));
+      }
+
+      for (const ball of balls) {
+        ball.t += dt;
+        const { depth } = ball.fate;
+        if (ball.phase === "fall") {
+          if (ball.t < ball.fate.t) {
+            ball.x = ball.x0 + ball.vx * ball.t;
+            ball.y = SPAWN_Y + 0.5 * GRAVITY * ball.t * ball.t;
+          } else {
+            const net = depth === slabs.length;
+            ball.x = ball.fate.x;
+            ball.y = ball.fate.y;
+            ball.vy = -GRAVITY * ball.fate.t * (net ? 0.5 : 0.36);
+            ball.vx *= net ? 0.3 : 0.5;
+            ball.phase = "bounce";
+            count(ids[depth]);
+            flash(ids[depth]);
+          }
+        } else if (ball.phase === "bounce") {
+          ball.vy += GRAVITY * dt;
+          ball.x += ball.vx * dt;
+          ball.y += ball.vy * dt;
+          const floor = restY(depth, ball.x);
+          if (ball.y >= floor) {
+            ball.y = floor;
+            ball.vx *= 0.6;
+            ball.vy *= -0.4;
+            if (Math.abs(ball.vy) < 0.04) {
+              ball.phase = "rest";
+              ball.t = 0;
+            }
+          }
+        } else if (ball.t > REST_MS) {
+          ball.el.style.opacity = String(
+            Math.max(0, 1 - (ball.t - REST_MS) / FADE_MS)
+          );
+        }
+        render(ball);
+      }
+
+      balls = balls.filter(ball => {
+        const done = ball.phase === "rest" && ball.t > REST_MS + FADE_MS;
+        if (done) ball.el.remove();
+        return !done;
+      });
+
+      if (next === drops.length && balls.length === 0) {
+        drops = plan();
+        next = 0;
+        start = clock + PAUSE_MS;
+      }
+    };
+
+    let frame = 0;
+    let last = 0;
+    const tick = (now: number) => {
+      step(Math.min(MAX_DT, now - last));
+      last = now;
+      frame = requestAnimationFrame(tick);
+    };
+    const resume = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(now => {
+        last = now;
+        tick(now);
+      });
+    };
+    const pause = () => {
+      cancelAnimationFrame(frame);
+      frame = 0;
+    };
+
+    const observer = new IntersectionObserver(
+      ([entry]) => (entry.isIntersecting ? resume() : pause()),
+      { threshold: 0.2 }
+    );
+    observer.observe(svg);
+
+    cleanups.add(() => {
+      pause();
+      observer.disconnect();
+      flashTimers.forEach(timer => clearTimeout(timer));
+    });
+  }
+
+  document.addEventListener("astro:page-load", () =>
+    document.querySelectorAll<HTMLElement>("[data-swiss-cheese]").forEach(setup)
+  );
+  document.addEventListener("astro:before-swap", () => {
+    cleanups.forEach(cleanup => cleanup());
+    cleanups.clear();
+  });
+</script>

@@ -1,0 +1,343 @@
+---
+title: 2022东北四省赛 
+pubDatetime: 2022-06-01T17:25:30+08:00
+slug: 2022东北四省赛
+legacyPath: 2022/06/01/2022东北四省赛
+categories:
+  - ICPC/CCPC
+  - 算法学习
+math: true
+
+description: 2022 东北四省赛题解：树的直径、数论与迷宫搜索。
+tags:
+  - 算法竞赛
+  - 图论
+  - ICPC/CCPC
+  - 算法学习
+---
+
+## 目录
+
+## B.Capital Program
+
+### 题目解析 
+
+因为直径中点到各个叶子节点的距离最短，所以需要统计各个点距离中点n的距离以及当前点能到达的最大深度，故答案为前$n-k$个点里最大的$maxdepth[i]-depth[i]$
+
+### Code
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+#define ll long long
+#define ull unsigned long long
+#define endl "\n"
+#define lowbit(x) ((-(x))&(x))
+const double eps = 1e-6;
+const int INF = 0x3f3f3f3f;
+
+const int MAX=1e5+10;
+ll cnt=0;
+ll h[MAX*2],e[MAX*2],ne[MAX*2],d[MAX*2];
+ll n,k,maxd=-MAX,st=1,p[MAX],maxds[MAX],ans[MAX],res=-INF;
+bool vis[MAX];
+
+bool cmp(ll a,ll b){
+    return a>b;
+}
+
+void add(int a,int b){
+    e[++cnt] = b;
+    ne[cnt] = h[a];
+    h[a] = cnt;
+}
+
+void dfs(ll u){
+    vis[u]=true;
+    for(ll i=h[u];i;i=ne[i]){
+        ll v = e[i];
+        if(!vis[v]){
+            d[v] = d[u]+1;
+            dfs(v);
+        }
+    }
+}
+
+void dfs1(ll u){
+    vis[u]=true;
+    for(ll i=h[u];i;i=ne[i]){
+        ll v = e[i];
+        if(!vis[v]){
+            p[v] = u;
+            d[v] = d[u]+1;
+            dfs1(v);
+        }
+    }
+    vis[u]=false;
+}
+
+void dfs2(ll u){
+    maxds[u]=d[u];
+    vis[u]=true;
+    for(ll i=h[u];i;i=ne[i]){
+        ll v=e[i];
+        if(!vis[v]){
+            d[v]=d[u]+1;
+            dfs2(v);
+            maxds[u]=max(maxds[u],maxds[v]);
+        }
+    }
+}
+
+int main(void)
+{
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(0);
+    std::cout.tie(0);
+
+    scanf("%lld %lld",&n,&k);
+    ll u,v;
+    for(int i=1;i<n;i++){
+        scanf("%lld%lld",&u,&v);
+        add(u,v);add(v,u);
+    }
+    dfs(st);
+    for(int i=1;i<=n;i++){
+        if(d[i]>maxd){
+            st=i;
+            maxd=d[i];
+        }
+    }
+    memset(d,0,sizeof(d));
+    memset(vis,false,sizeof(vis));
+    maxd=-MAX;
+    dfs1(st);
+    for(int i=1;i<=n;i++){
+        if(d[i]>maxd){
+            st=i;
+            maxd = d[i];
+       }
+    }
+    ll mid=st;
+    for(int i=1;i<=(maxd+1)/2;i++){
+        mid=p[mid];
+    }
+    memset(d,0,sizeof(d));
+    dfs2(mid);
+    
+    for(int i=1;i<=n;i++){
+        ans[i]=maxds[i]-d[i];
+    }
+    sort(ans+1,ans+n+1,cmp);
+    for(int i=k+1;i<=n;i++){
+        res=max(res,ans[i]+1);
+    }
+    printf("%lld\n",res);
+    
+    return 0;
+}
+
+```
+## E.Plus
+
+### 题目解析
+
+找规律题，暴力打表即可
+证明：
+设 $p=2$，注意到 $q$ 是奇数, 则$2^q = (-1)^q = -1 \pmod{3}$。若 $q\neq3$ 则有 $q=1 \pmod{3}$ 或 $q=2 \pmod{3}$，可以得到 $p^q+q^p = -1+1 = 0 \pmod{3}$ 当 $q=3$ 时 可以取得唯一解 $p^q = q^p = 2^3+3^2 = 17$。
+
+
+### Code
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+#define endl "\n"
+#define ll long long
+const double eps = 1e-6;
+const int INF = 0x3f3f3f3f;
+
+const int MAX=1e8;
+
+ll qpow(ll x,ll y,const ll &mo){ll ans=1;if(y==0)return 1%mo;while(y){if(y&1)ans=(ans*x)%mo;x=(x*x)%mo;y>>=1;}return ans;}
+
+bool isprime(ll n){
+    if(n==1) return false;
+
+    for(int i=2;i<=sqrt(n);i++){
+        if(n%i==0){
+            return false; 
+        }
+    }
+    return true;
+}
+
+void db(){
+    ll n;
+    scanf("%lld",&n);
+    for(int i=1;i<=n;i++){
+        for(int j=i;j<=n;j++){
+            if(((isprime(i))&&(isprime(j)))){
+                if(isprime((ll)pow(i,j)+(ll)pow(j,i))){
+                    printf("%d %d\n",i,j);
+                }
+            }
+        }
+    }
+}
+
+int main(void)
+{
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(0);
+    std::cout.tie(0);
+    
+    // db();
+
+    ll n;
+    scanf("%lld",&n);
+    if(n<3) printf("0\n");
+    else printf("1\n2 3\n");
+
+    return 0;
+}
+
+```
+
+
+## K.Maze
+
+### 题目解析
+
+数据较小，故直接进行搜索即可。设状态为$(x,y,i,cnt,step)$来记录上一次移动的方向与连续移动的次数及方向。
+
+### Code
+
+```cpp
+#include <bits/stdc++.h>
+#include <cstdio>
+
+using namespace std;
+
+#define ll long long
+#define ull unsigned long long
+#define endl "\n"
+#define lowbit(x) ((-(x))&(x))
+const double eps = 1e-6;
+const int INF = 0x3f3f3f3f;
+
+const int dx[] = {0,0,1,-1};
+const int dy[] = {1,-1,0,0};
+
+const int MAX=110;
+ll n,m;
+bool g[MAX][MAX];
+bool vis[MAX][MAX][4][MAX];
+
+struct node{
+    ll x,y,cnt,i,step;
+};
+
+void solve(){
+    memset(g,false,sizeof(g));
+    memset(vis,false,sizeof(vis));
+
+    queue<node> q;
+    scanf("%lld %lld",&n,&m);
+
+    char ch;
+    for(int i=1;i<=n;i++){
+        for(int j=1;j<=n;j++){
+            cin >> ch;
+            if(ch=='.') g[i][j]=true; 
+        }
+    }
+    node p,np;
+    if(g[1][1]) q.push({1,1,0,-1,0});
+    
+    while(!q.empty()){
+        p = q.front();
+
+        if(p.x==n&&p.y==n){
+            printf("%lld\n",p.step);
+            return;
+        }
+        q.pop();
+        for(int i=0;i<4;i++){
+            np.x = p.x+dx[i],np.y=p.y+dy[i],np.step = p.step+1;
+            np.i = p.i,np.cnt = p.cnt;
+            if(i==np.i) np.cnt++;
+            else np.cnt=1;
+            np.i = i;
+            if(!g[np.x][np.y]||vis[np.x][np.y][np.i][np.cnt]||np.cnt>m) continue;
+            vis[np.x][np.y][np.i][np.cnt] = true;
+            q.push(np);
+        }
+    }
+    printf("-1\n");
+    return;
+}
+
+int main(void)
+{
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(0);
+    std::cout.tie(0);
+    
+    // freopen("maze.in","r",stdin);
+    ll T;
+    scanf("%lld",&T);
+    while(T--){
+        solve();
+    }
+
+    return 0;
+}
+```
+
+## L.Polygon
+
+### 题目解析
+
+签到题，判断$n$条边能否组成$n$边形只需判断任意$n-1$条边的和是否大于第其$n$条边。
+
+### Code
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+#define endl "\n"
+#define ll long long
+const double eps = 1e-6;
+const int INF = 0x3f3f3f3f;
+
+const int MAX=2*1e5+10;
+ll n,a[MAX];
+
+int main(void)
+{
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(0);
+    std::cout.tie(0);
+
+    scanf("%lld",&n);
+    for(int i=1;i<=n;i++) scanf("%lld",&a[i]);
+    
+    sort(a+1,a+1+n);
+    int sum=0;
+    for(int i=1;i<n;i++) sum+=a[i];
+    
+    if(a[n]>sum) cout << "YES" << endl;
+    cout << "NO" << endl; 
+
+    return 0;
+}
+
+```
+

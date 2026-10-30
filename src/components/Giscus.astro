@@ -1,0 +1,74 @@
+---
+import { useTranslations } from "@/i18n";
+
+type Props = { term: string };
+const { term } = Astro.props;
+const t = useTranslations(Astro.currentLocale);
+const enabled = import.meta.env.PUBLIC_GISCUS_ENABLED === "true";
+---
+
+<section
+  id="comments"
+  aria-labelledby="comments-title"
+  class="border-border mt-8 border-t border-dashed pt-8"
+  data-pagefind-ignore
+>
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+    <h2 id="comments-title" class="text-lg font-semibold">{t.post.comments}</h2>
+    {
+      enabled && (
+        <a
+          href="https://github.com/Season0518/blog/discussions/categories/announcements"
+          class="text-foreground/70 hover:text-accent text-sm underline underline-offset-4"
+        >
+          {t.post.commentsOnGitHub}
+        </a>
+      )
+    }
+  </div>
+  {
+    enabled ? (
+      <giscus-widget
+        class="block"
+        repo="Season0518/blog"
+        repoid="R_kgDOVZ_yXQ"
+        category="Announcements"
+        categoryid="DIC_kwDOVZ_yXc4DJ_tc"
+        mapping="specific"
+        term={term}
+        strict="1"
+        reactionsenabled="1"
+        emitmetadata="0"
+        inputposition="top"
+        theme="preferred_color_scheme"
+        lang={Astro.currentLocale === "en" ? "en" : "zh-CN"}
+        loading="lazy"
+      />
+    ) : (
+      <p class="text-foreground/70 text-sm">{t.post.commentsUnavailable}</p>
+    )
+  }
+</section>
+
+<script>
+  // Compile out the client integration entirely from the mainland build.
+  if (
+    import.meta.env.MODE !== "cn" &&
+    import.meta.env.PUBLIC_GISCUS_ENABLED === "true"
+  ) {
+    void import("giscus");
+
+    function syncCommentsTheme() {
+      const theme =
+        document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+      document.querySelector("giscus-widget")?.setAttribute("theme", theme);
+    }
+
+    syncCommentsTheme();
+    document.addEventListener("astro:page-load", syncCommentsTheme);
+    new MutationObserver(syncCommentsTheme).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+  }
+</script>

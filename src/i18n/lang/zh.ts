@@ -1,0 +1,68 @@
+import type { UIStrings } from "../types";
+
+export default {
+  nav: {
+    home: "首页",
+    posts: "文章",
+    tags: "标签",
+    about: "关于",
+    archives: "归档",
+    search: "搜索",
+  },
+  post: {
+    publishedAt: "发布于",
+    updatedAt: "更新于",
+    sharePostIntro: "分享文章：",
+    sharePostOn: "分享到 {{platform}}",
+    sharePostViaEmail: "通过邮件分享",
+    tagLabel: "标签",
+    backToTop: "回到顶部",
+    goBack: "返回",
+    editPage: "编辑文章",
+    previousPost: "上一篇",
+    nextPost: "下一篇",
+    licenseNotice: "Licensed under CC BY-NC-SA 4.0",
+    comments: "评论",
+    commentsOnGitHub: "在 GitHub 中查看",
+    commentsUnavailable: "评论暂未开放。",
+    copyAttribution:
+      "作者：{{author}}\n来源：{{url}}\n协议：CC BY-NC-SA 4.0（署名—非商业性使用—相同方式共享）\nhttps://creativecommons.org/licenses/by-nc-sa/4.0/",
+  },
+  pagination: { prev: "上一页", next: "下一页", page: "页" },
+  home: {
+    socialLinks: "其他地方",
+    featured: "精选文章",
+    recentPosts: "最近文章",
+    allPosts: "全部文章",
+  },
+  footer: {
+    copyright: "Copyright",
+  },
+  pages: {
+    tagTitle: "标签",
+    tagDesc: "包含此标签的文章",
+    tagsTitle: "标签",
+    tagsDesc: "按主题浏览文章。",
+    postsTitle: "文章",
+    postsDesc: "写过的题解、实践与学习笔记。",
+    archivesTitle: "归档",
+    archivesDesc: "按时间浏览文章。",
+    searchTitle: "搜索",
+    searchDesc: "搜索文章内容。",
+  },
+  a11y: {
+    skipToContent: "跳到主要内容",
+    openMenu: "打开菜单",
+    closeMenu: "关闭菜单",
+    toggleTheme: "切换主题",
+    searchPlaceholder: "搜索文章…",
+    noResults: "没有找到结果",
+    goToPreviousPage: "转到上一页",
+    goToNextPage: "转到下一页",
+  },
+  notFound: {
+    title: "404 页面不存在",
+    message: "没有找到此页面",
+    goHome: "返回首页",
+  },
+} satisfies UIStrings;

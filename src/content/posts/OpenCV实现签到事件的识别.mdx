@@ -1,0 +1,121 @@
+---
+title: OpenCV实现签到事件的识别
+pubDatetime: 2022-09-02T07:07:39+08:00
+slug: OpenCV实现签到事件的识别
+legacyPath: 2022/09/02/OpenCV实现签到事件的识别
+description: 通过Python+OpenCV实现了腾讯会议的自动签到模块。
+categories:
+ - OpenCV
+ - Python
+math: true
+tags:
+  - OpenCV
+  - Python
+---
+
+## 目录
+
+## 0x00 前言
+
+最近阴间作息导致下午期间萎靡不振。昨天刚把离散结构的签到睡了过去，一睁眼都要下课了，在一睁眼疯狂星期四没了。于是乎准备着手分析一下腾讯会议的签到模块
+
+## 0x01 尝试通过Call来入手
+
+在没开始做之前，思路是首先拿OD调试一下，由于腾讯会议客户端是Qt做的，大概猜测跳新窗口是用的Widget之类的东西，所以查一下数据区定位到关键的类，bpsend下断然后看哪一条程序停下了就行，拿到Call了直接做后台签到。
+
+但是现实比较残酷，腾讯会议有反调试，我的渣逆向技术不足以让我过掉他的反调，于是转向了纯视觉方案。
+
+~~高端的脚本往往采用最朴素的工作方式~~
+
+## 0x02 取会议窗口图片
+
+首先当然可以直接截整个窗口的图，但是分析起来时间较长，比较占用资源，遂用FindWindow方法取腾讯会议的Hwnd，然后调用Pillow的GrabImage方法就行，于是第一版代码如下
+
+``` python
+hwnd = win32gui.FindWindow(None,'腾讯会议')
+rect = win32gui.GetWindowRect(hwnd)
+img = ImageGrab.grab(bbox=rect)
+```
+
+然而问题被发现了，截图的区域始终异常，于是打开Spy++查看取的句柄是否正确。
+
+在通过Spy++查看后，发现了三个同名且同类名的窗口，且不属于父子关系，于是不能直接使用FindWindow方法来取窗口的hwnd。
+
+通过Spy++可以看见，因为他们的窗口差异只有Client Rect和Rectangle。观察可知，要找的主窗口的窗口尺寸最大。所以可以通过EnumWindows方法枚举所有的窗口句柄，然后在通过Callback回调函数将符合条件的句柄加入list中在进行筛查和处理
+
+``` python
+def callback(hwnd, rects):
+    rect = win32gui.GetWindowRect(hwnd)
+    if win32gui.GetWindowText(hwnd)=='腾讯会议':
+        rects.append(rect)        
+    return
+
+def getWindowPos():
+    rects = []
+    win32gui.EnumWindows(callback,rects)
+
+    rectSize = -1
+    mainRect = None
+
+    for rect in rects:
+        currSize = (rect[2]-rect[0])*(rect[3]-rect[1])
+        if int(rectSize) < int(currSize):
+            mainRect = rect
+            rectSize = currSize
+
+    return mainRect
+
+def getScreenImage(windowRect):
+    img = ImageGrab.grab(bbox=windowRect)
+
+    return img
+```
+
+## 0x02 寻找目标
+
+拿到窗口图片以后要做的就是定位目标，想到的方案有两种，1是OCR定位文本，2是模板匹配。
+
+``` python
+def findButtonOCR(img,text):
+    result = pytesseract.image_to_data(img,output_type=Output.DICT,lang='chi_sim')
+
+    for i in range(len(result['text'])):
+        if result['text'][i] == text:
+            (x,y,w,h) = (result['left'][i],result['right'][i],result['width'][i],result['height'][i])
+            return [int(x+w/2),int(y+h/2)]
+        
+    return None
+
+def findButtonCV(pilImg,pattern,rect):
+    confidence = 0.95
+    cv2Img = cv2.cvtColor(numpy.asarray(pilImg),cv2.COLOR_RGB2BGR)
+    pattern_img = cv2.imread(pattern)
+
+    result = cv2.matchTemplate(cv2Img,pattern_img,cv2.TM_CCORR_NORMED)
+    w,h = pattern_img.shape[::2]
+    min_val,max_val,min_loc,max_loc = cv2.minMaxLoc(result)
+
+    if max_val > confidence:
+        x = int(max_loc[0]+w)
+        y = int(max_loc[1]+h)
+        return x+rect[0],y+rect[1]
+    
+    return None
+
+```
+
+很快啊，两个代码就敲出来了，由于pytesseract中文的OCR识别效果太差，就没有采用了，实战采用的是opencv-python来做模板匹配，这里用的confidence是0.95，足以稳定应付固定模板了
+
+## 0x03 后续细节
+
+拿到坐标以后的后续操作就比较简单了，移动只需要调用SetCursorPos，点击调用mouse_event，定时入会操作其实在高版本的腾讯会议中有小trick
+
+``` sh
+start wemeet://page/inmeeting?meeting_code={MeetingId} 
+```
+
+通过这个链接即可直接调用腾讯会议，所以实现起来并无难度
+
+## 0x04 后记
+
+一次烂活，局限性还是很多。比如说不能后台识别；整体是开环控制，容易翻车等等等，但是作为一个赶工出来应急的产物总体来讲还算可以接受。实现的难点已经全部展示出来了，所以用到的其余代码暂时不会全部开源。

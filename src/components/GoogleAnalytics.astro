@@ -1,0 +1,27 @@
+---
+type Props = {
+  measurementId: string;
+};
+
+const { measurementId } = Astro.props;
+---
+
+<!-- Google tag (gtag.js) -->
+<script
+  is:inline
+  async
+  src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`}></script>
+<script is:inline define:vars={{ measurementId }}>
+  // Initialize once; GA4's history-based enhanced measurement handles navigation.
+  if (!window.__ga4Initialized) {
+    window.dataLayer = window.dataLayer || [];
+    window.gtag =
+      window.gtag ||
+      function () {
+        window.dataLayer.push(arguments);
+      };
+    window.gtag("js", new Date());
+    window.gtag("config", measurementId);
+    window.__ga4Initialized = true;
+  }
+</script>

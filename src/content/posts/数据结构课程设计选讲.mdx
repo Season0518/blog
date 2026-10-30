@@ -1,0 +1,280 @@
+---
+title: 数据结构课程设计选讲
+pubDatetime: 2022-06-19T15:57:42+08:00
+slug: 数据结构课程设计选讲
+legacyPath: 2022/06/19/数据结构课程设计选讲
+description: 从数据结构的课程设计选题中，选择了一些具有练习价值的题目。
+categories:
+ - 数据结构
+ - 课内知识
+math: true
+tags:
+  - 数据结构
+  - 课内知识
+---
+
+import SampleCase from '@/components/SampleCase.astro';
+
+## 目录
+
+## 1.信号放大器
+
+### 题目简介
+
+天然气经过管道网络从其生产基地输送到消耗地，在传输过程中，其性能的某一个或 几个方面可能会有所衰减（例如气压）。为了保证信号衰减不超过容忍值，应在网络中的合 适位置放置放大器以增加信号（例如电压）使其与源端相同。设计算法确定把信号放大器 放在何处，能使所用的放大器数目最少并且保证信号衰减不超过给定的容忍值。
+
+### 数据输入规范
+
+- 第一行两个整数 $n,r$ 表示一共有 $n$ 个节点，$r$ 为信号衰减量的容忍值。
+- 此后的 $n-1$ 行，每行三个整数 $u,v,w$，代表节点 $u$ 和节点 $v$ 之间存在一条信号衰减为 $w$ 的边。
+
+### 样例 #1
+
+<SampleCase number={1} input={`11 3
+1 2 1
+1 3 3
+2 4 2
+2 5 2
+4 8 2
+4 9 1
+3 6 1
+3 7 2
+6 10 2
+7 11 2`} output={`7 3 4`} />
+
+### 涉及知识点
+
+邻接表,树的遍历,递推
+
+### 代码
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+const int MAX = 1e5+10;
+
+int h[MAX*2], e[MAX*2], ne[MAX*2], w[MAX*2];
+int cnt = 0;
+
+int n,r;
+int dp[MAX];
+vector<int> res;
+
+void add(int a, int b, int val) {
+    e[++cnt] = b;
+    w[cnt] = val;
+    ne[cnt] = h[a];
+    h[a] = cnt;
+}
+
+void dfs(int u, int fa) {
+    for (int i = h[u]; i; i = ne[i]) {
+        int v = e[i];
+        if (v != fa) {
+            dfs(v, u);
+            if (dp[v] + w[i] > r) {
+                res.push_back(v);
+            }
+            else {
+                dp[u] = max(dp[u], dp[v] + w[i]);
+            }
+        }
+    }
+}
+
+int main(void) {
+    int a, b, val;
+
+    cin >> n >> r;
+    for (int i = 1; i < n; i++) {
+        cin >> a >> b >> val;
+        add(a, b, val);
+        add(b, a, val);
+    }
+    dfs(1, 0);
+    for (auto const& x : res) printf("%d ", x);
+    return 0;
+}
+```
+
+
+## 2.医院选址问题
+
+### 题目简介
+
+$n$个村庄之间的交通图可以用有向网图来表示，图中边\<$v_i , v_j$>上的权值表示从村庄 $i$ 到村庄 $j$ 的道路长度。现在要从这 $n$ 个村庄中选择一个村庄新建一所医院，问这所医院应 建在哪个村庄，才能使所有的村庄离医院都比较近？
+
+### 数据输入规范
+
+- 第一行两个整数 $n,m$ 表示一共有 $n$ 个村庄，$m$ 为连接村庄的路的数量。
+- 此后的 $m$ 行，每行三个整数 $u,v,w$，代表村庄 $u$ 到村庄 $v$ 存在一条路径长为 $w$ 的路。
+
+### 样例 #1
+
+<SampleCase number={1} input={`5 7
+1 2 1
+2 3 2
+3 4 2
+4 3 3
+4 2 1
+3 5 4
+5 4 5`} output={`4`} />
+
+### 涉及知识点
+
+Floyd,最短路
+
+### 代码
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+const int MAX = 1100;
+int g[MAX][MAX];
+int dp[MAX][MAX];
+int degree[MAX];
+const int INF=0x3f3f;
+int n,m;
+
+void floyd(){
+    for(int v=1; v<=n; v++)
+        for(int w=1; w<=n; w++){
+         dp[v][w]=g[v][w];
+    }
+    for(int u=1; u<=n; u++){
+        for(int v=1; v<=n; v++){
+            for(int w=1; w<=n; w++){
+                if(dp[v][u]+dp[u][w]<dp[v][w])
+                {
+                    dp[v][w]=dp[v][u]+dp[u][w];
+                }
+            }
+        }
+    }
+}
+
+int main(void){
+    cin >> n >> m;
+
+    for(int i=1;i<=n;i++){
+        for(int j=1;j<=n;j++){
+            if(i==j) g[i][j]=0;
+            else g[i][j]=INF;
+        }
+    }
+
+    int x,y,z;
+    for(int i=1;i<=m;i++){
+        cin >> x >> y >> z;
+        g[x][y] = z;
+    }
+    floyd(); 
+    for(int i=1;i<=n;i++){
+        int max=dp[0][i];
+        for(int j=1;j<=n;j++)
+        {
+            if(dp[j][i]>max)
+                max=dp[j][i];
+        }
+        degree[i]=max;
+    }
+
+    vector<pair<int,int>> res;
+    for(int i=1;i<=n;i++) res.push_back({degree[i],i});
+    sort(res.begin(),res.end());
+    printf("%d",res.begin()->second); 
+
+    return 0;
+
+}
+
+```
+
+
+## 3.表达式求值
+
+### 题目简介
+
+对一个合法的中缀表达式求值。 假设表达式只包含+、-、×、÷ 四个双目运算符，且运算符本身不具有二义性。
+
+### 数据输入规范
+
+一行字符串$s$：表示要求解的表达式
+
+### 样例 #1
+
+<SampleCase number={1} input={`3*(1+2)-4/2`} output={`7`} />
+
+### 样例 #2
+
+<SampleCase number={2} input={`(114+514)-191*9+810`} output={`-281`} />
+
+### 涉及知识点
+
+单调栈
+
+### 代码
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+stack<int> num;
+stack<char> op;
+
+void eval(void){
+    auto b = num.top(); num.pop();
+    auto a = num.top(); num.pop();
+    auto c = op.top(); op.pop();
+
+    int ans;
+    if(c=='+') ans=a+b;
+    else if(c=='-') ans=a-b;
+    else if(c=='*') ans=a*b;
+    else if(c=='/') ans=a/b;
+
+    num.push(ans);
+
+    return;
+}
+
+
+int main(void){
+    unordered_map<char,int> p = {{'+',1},{'-',1},{'*',2},{'/',2}};
+
+    string str;
+    cin >> str;
+
+    for(int i=0;i<str.length();i++){
+        char c=str[i];
+        if(isdigit(c)){
+            int x=0,j=i;
+            while(j<str.length()&&isdigit(str[j])) x=x*10+str[j++]-'0';
+            i = j-1;
+            num.push(x);
+        }
+        else if(c=='(') op.push(c);
+        else if(c==')') {
+            while(op.top()!='(') eval();
+            op.pop();
+        }
+        else{
+            while(op.size()&&p[op.top()]>=p[c]) eval();
+            op.push(c);
+        }
+    }
+
+    while(op.size()) eval();
+
+    cout << num.top() << endl;
+
+    return 0;
+}
+
+```
+

@@ -1,0 +1,205 @@
+---
+title: VibeCoding 杂谈 —— 0x02 被低估的流水线
+pubDatetime: 2026-10-30T12:00:02+08:00
+description: CI/CD或流水线对于个人或者小团队来说真的是没有意义的吗？我认为不是。
+draft: false
+categories:
+  - VibeCoding
+tags:
+  - VibeCoding
+  - AI
+  - Agent
+  - CICD
+  - DevOps
+---
+
+import SwissCheese from "@/components/sketch/SwissCheese.astro";
+import CodexWorkflows from "@/components/sketch/CodexWorkflows.astro";
+
+在若干年前，CI/CD和流水线这几个词在我个人的认知中是useless的，因为本身构建流程和我自己写代码的速度都有限，我每次写完直接把artifact传服务器上，打个指令就行，平时写代码也是一步三运行，每写完一个函数就先打一下桩，最后在调一调，如果配流水线的话还要写YAML，容器，处理一堆奇怪的错误和依赖，但在2026年的下半场，这件事的性价比被彻底改写了：**写 YAML 的成本趋近于零，而 Agent 生产 Slop 的速度趋近于光速**。
+
+AI Agent可以独立的帮我完成大量的代码生产工作，所以我逐渐意识到了传统的Coding模式不适用于Agent Driven Development。我在2026年我开始着手去搭建一些CI/CD流程来让整个开发流程变得健壮。一个健康的流水线中它可以极大程度上的提升交付节奏。
+
+所以我认为 CI/CD 不是 Agent 时代的可选项，如果想快速的用Agent去交付产品，CI/CD Workflow 就是必须项。
+
+## 一条成熟的流水线是什么样的
+
+这里以 Codex 的[官方仓库](https://github.com/openai/codex/blob/c15d0ce323f2197da865871502dc6ea7ef5b8ddb/.github/workflows/)的作为例子，它的结构大致如下：
+
+<CodexWorkflows />
+
+框架上是很符合直觉的，它首先需要进行[合并检查](https://github.com/openai/codex/blob/c15d0ce323f2197da865871502dc6ea7ef5b8ddb/.github/workflows/blocking-ci.yml) 在合并候选提交上并行执行代码检查、测试、构建和项目规则检查，再统一汇总结果。必需检查全部成功，CI Gate才通过；当代码进入`main`后，除了Rerun部分测试，[合入后的验证](https://github.com/openai/codex/blob/c15d0ce323f2197da865871502dc6ea7ef5b8ddb/.github/workflows/postmerge-ci.yml) 还覆盖更完整的测试、构建和运行环境，部分额外检查按变更范围触发。这样既保留了 PR 上的快速反馈，也为更重的验证安排了位置；最后，在合适的时机，[把代码变成产物](https://github.com/openai/codex/blob/c15d0ce323f2197da865871502dc6ea7ef5b8ddb/.github/workflows/rust-release.yml) ，它检查版本一致性，构建目标产物，完成签名、验证和打包，再发布到相应渠道。
+
+## 为什么要我们需要一些不可变检查
+
+人天生是自信的，而自信带来了某种不可信："我就改了一行文档，应该没事吧"、"单元测试过了，应该没问题吧"。CI 把每次变更放进统一的环境里，自动执行检查；再把必须通过的项目设成合并前的 Required Check，就不必依赖开发者记得跑脚本。它的出发点很朴素：**不要相信任何开发者会自觉完成所有检查。**
+
+Agent 把这个问题放大了。在 Anthropic 的 monorepo 中，每天合入的变更从 2026 年 5 月的约 2,500 个增长到 9 月的 30,000 个以上（[How the Claude Code team does code review](https://claude.dev/blog/solving-code-review-at-anthropic/)）；同期 CI Job 数量在半年内增长了 25 倍，测试数量增长了 10 倍，而工程师只增加了一点点（[Agentic coding is straining CI](https://claude.com/resources/articles/agentic-coding-is-straining-ci-heres-how-we-scaled-test-impact-analysis-at-anthropic)）。OpenAI 的 [Harness engineering](https://openai.com/index/harness-engineering/) 实验中，3 名工程师驱动 Codex 在五个月内合入了约 1,500 个 PR，产出约一百万行代码，人均每天 3.5 个 PR，且**零行手写代码**。代码和变更的增长速度，已经远远超过了人的逐项检查能力。
+
+如果我们不信任其他的开发者，那么更不应该相信Coding Agent。因为它和人类天然不对齐。让它写文档，它能直接 check-in 一份 20K 的 Markdown；让它实现一个已经 self-explain 的函数，它会把自己在 Agent Loop 里踩过的坑逐条写进注释；上下文里加载了一坨 Slop，它的第一反应是把这坨 Slop 扶起来，而不是推倒重来；测试不过，那就把断言改一改，或者顺手加个 `skip`。在它的奖励函数里，"测试变绿"和"问题被解决"是同一件事。
+
+一旦项目在缺少健壮的Workflow中奔放迭代，就回不了头了。比如说若干份几万字的文档，蜘蛛网式的代码。如果仅凭人力几乎无法治理，因为甚至没办法在里面定位到你想改的地方，唯一的办法是继续让 Agent 改，直到项目彻底维护不下去，然后重构，推倒重来，变成月抛代码（笑。
+
+那是不是有了流水线和单元测试就万事大吉了？显然不是。任何一层检查都有漏洞：Lint 查不出业务逻辑错误，测试覆盖不到的路径就是盲区，AI Review 会误报也会漏报，人类 Reviewer 会疲劳。
+
+Anthropic 在博客里提到了一个很经典的比喻：瑞士奶酪模型。每一片奶酪都有洞，但只要多叠几片，能穿过所有洞的问题就很少了。真的穿过去了，也有反悔的机制。
+
+<SwissCheese />
+
+CI 能检查我们已经写下来的规则，AI Review 能帮忙发现更多问题，但需求里没说清楚的取舍、现有检查没有表达出来的约束，仍然需要人来判断。这个功能是不是我们真正需要的？为了省几行代码引入一个新依赖值不值？眼前的修复会不会让后面三个月的维护变得更困难？
+
+LLM需要足够的Context，这是我一直以来的观点。架构的设计或者是业务上的缺陷可能是人类并没有给出完备的上文，当然自己写出来完整的条件也不太可能。在编写完若干轮Prompt后应该在 Review 时检查实现有没有偏离目标，以便我们可以退回让AI修改代码实现。
+
+当然，人的注意力也是有限的，所以Human Approval 同样是有洞的一片奶酪，让人逐行检查 Agent 生成的所有代码也不现实。自动化可以过滤掉能机械判断的问题，但有的问题并不是可以机械判断解决的，例如需求、设计和风险等。所以我个人在实际开发过程中使用了自动搭建[Ephemeral Environment](https://dev.to/shipyard/ephemeral-environments-a-quick-overview-3m7)的Job。当PR打开时，它自动在cluster中创建一个可供交互的环境，在集成测试完毕，Pull Request合并后它自动释放并销毁。这么做首先这样方便了Agent在与生产同构的环境中进行自主测试，也减少了Reviewer的认知负担，避免了仅仅因为CI绿了就Approve的情况。
+
+## 测试真的通过了吗？
+
+文档行数、依赖方向都有相对明确的判断标准，业务逻辑则通常要靠测试验证。但开头那条流水线里，Required Check通过了，真的就能说明改动是对的吗？
+
+在 Agent 主导的开发里，这个问题比以往尖锐得多。过去测试和实现往往出自不同的人、写于不同的时间，测试多少代表了一份独立的预期；而现在，**实现和测试通常是同一个 Agent 在同一个上下文里一口气写出来的**。它对需求的误解会原样复制进测试里，然后测试完美通过。
+
+最常见的测试质量指标是覆盖率，但覆盖率衡量的是"代码有没有被执行"，并不解决测试本身的质量问题。即使是在公司内，也有为了所谓KPI去刷测试指标的代码：
+
+```go
+// shipping.go
+package shipping
+
+// 满 100 元包邮，否则收取 10 元运费。
+func ShippingFee(total int) int {
+	if total >= 100 {
+		return 0
+	}
+	return 10
+}
+```
+
+```go
+// shipping_test.go
+package shipping
+
+import "testing"
+
+func TestShippingFee(t *testing.T) {
+	for _, total := range []int{0, 99, 100, 200} {
+		t.Logf("订单金额：%d，运费：%d", total, ShippingFee(total))
+	}
+}
+```
+
+此类为了测试而测试的代码是非常经典的，2026年的LLM不一定会写出这样低级的代码，但是一定会有类似的情况出现。某些KOL分享的Prompt模板中可能就会写到要做所谓的TDD，你稍加思考后觉得很有道理，将它复制到了你的`AGENTS.MD`中，AI可能就会为了测试覆盖率生产这样的代码。
+
+Inozemtseva 和 Holmes 在 ICSE 2014 的 [Coverage Is Not Strongly Correlated with Test Suite Effectiveness](https://cs.uwaterloo.ca/~rtholmes/papers/icse_2014_inozemtseva.pdf) 中，对最大 72.4 万行的 Java 项目生成了 31,000 个测试套件。结论是：**在控制测试数量之后，覆盖率和测试有效性只有低到中等的相关性**，而且分支覆盖、MC/DC 这些更强的覆盖形式也没有提供更多信息。覆盖率适合用来找"哪里没测"，但不适合作为质量目标。
+
+到了 LLM 时代这个问题更严重。[MutGen](https://arxiv.org/abs/2506.02954) 的作者在实验中观察到，有的测试套件覆盖率 100%，变异分数却只有 4%。如果你把"覆盖率 ≥ 80%"写进 CI 门槛，Agent 会非常高效地把它刷上去。
+
+为了解决这个问题，我们引入了变异测试（Mutation Testing），它的思路非常朴素：**如果测试真的有用，那么把代码改坏以后，测试应该能发现。**
+
+工具会自动对源码做一系列微小的破坏，每个被破坏的版本叫一个**变异体（Mutant）**：把 `>=` 改成 `>`、把 `+` 改成 `-`、把条件取反、删掉一条语句……然后对每个变异体跑一遍测试：
+
+- 测试失败：变异体被**杀死（Killed）**，说明测试能发现这类错误。
+- 测试仍然通过：变异体**存活（Lived）**，说明测试有洞。
+
+继续看上面的 `ShippingFee`。那个测试输入了 `0、99、100、200`，行覆盖率 100%，两个分支都走到了，连包邮的边界值都有。现在只改一个符号，把 `>=` 改成 `>`：
+
+```go
+func ShippingFee(total int) int {
+	if total > 100 { // 故意改坏：恰好 100 元的订单不再包邮。
+		return 0
+	}
+	return 10
+}
+```
+
+按需求，100 元的订单应该免运费，现在却收了 10 元。上面的测试明明执行了 `ShippingFee(100)`，却依然通过，因为 `t.Logf` 只负责打印结果：打印 0 还是 10，都不会让测试失败。
+
+同样，把 `>=` 取反成 `<`，让不满 100 元的订单包邮、满 100 元的订单反而收费，测试也会通过；把 `return 10` 改成 `return 1000`，测试还是通过。这几个变异体全都能存活，而原来的测试覆盖率已经是 100%。这就是那个 test 坏的地方：业务逻辑已经错了，它却没有任何一句话能指出这个错误。
+
+要让测试有用，就得把需求变成明确的预期，而不是只把函数调用一遍。保留原来的输入，补上每种情况下应该收多少运费：
+
+```go
+// shipping_test.go（替换原来的测试函数）
+func TestShippingFee(t *testing.T) {
+	for _, tc := range []struct {
+		total int
+		want  int
+	}{
+		{total: 0, want: 10},
+		{total: 99, want: 10},
+		{total: 100, want: 0},
+		{total: 200, want: 0},
+	} {
+		if got := ShippingFee(tc.total); got != tc.want {
+			t.Errorf("订单金额 %d：运费应为 %d，实际为 %d",
+				tc.total, tc.want, got)
+		}
+	}
+}
+```
+
+这个版本在原来的实现上通过，在上面三个分别改坏的版本上都会失败，也就杀死了这三个变异体。前后覆盖率都是 100%，但现在测试终于能区分"算对了"和"算错了"。
+
+变异测试的核心指标是变异分数，Go 的变异测试工具 [Gremlins](https://gremlins.dev/) 里叫 Test Efficacy：
+
+$$
+\mathrm{Efficacy} = \frac{\mathrm{Killed}}{\mathrm{Killed} + \mathrm{Lived}}
+$$
+
+另外还有一个 Mutant Coverage，表示有多少变异体至少被测试执行到了：
+
+$$
+\mathrm{Mutant\ Coverage} = \frac{\mathrm{Killed} + \mathrm{Lived}}{\mathrm{Killed} + \mathrm{Lived} + \mathrm{NotCovered}}
+$$
+
+当然它也有局限。同一篇 FSE 论文中，有 17% 的真实 Bug 和任何变异体都不耦合，这是变异测试的根本局限。另外还有**等价变异体**的问题：有些变异改完以后语义完全不变（比如循环条件 `i < len(s)` 改成 `i != len(s)`），这种变异体永远杀不死，却会拉低分数。所以变异测试同样只是奶酪中的一片，不是银弹。
+
+但对 Agent 来说，变异测试的用途更多是提供一个反馈极其具体的信号，工具告诉 Agent "第 3 行没覆盖"，Agent 的最优策略是随便写个用例把这行跑一遍。而变异测试告诉 Agent "把 `>=` 改成 `>` 以后，你的测试仍然通过"，这是一个标准的反例。对于上面的运费测试，`100` 这个输入已经有了，真正需要补的是 `ShippingFee(100)` 必须等于 `0` 的断言。这也是设计 CI 反馈时可以借鉴的地方：反馈越明确，Agent 就越容易围绕真正的问题修改代码。
+
+Meta 把这个思路反过来用到了极致。他们的 [ACH](https://arxiv.org/abs/2501.12862)（Automated Compliance Hardener）不是让 LLM 直接写测试，而是：
+
+1. 先让 LLM 针对某一类关注点生成**当前没有任何测试能发现**的变异体，也就是"模拟的 Bug"；
+2. 再让 LLM 生成能杀死这些变异体的测试；
+3. 用一个 LLM 检测等价变异体，过滤掉永远杀不死的那部分。
+
+ACH 对生成的测试给出三条**布尔型的保证**：能构建、稳定通过（不 Flaky）、能发现现有测试发现不了的错误。至于"是否与关注点相关"、"是否符合现有测试风格"这种概率性的属性，则留给人类在 Code Review 中判断。它在 Meta 的 7 个平台、10,795 个 Kotlin 类上生成了 9,095 个变异体和 571 个测试，在 Messenger 和 WhatsApp 的 Test-a-thon 中，工程师接受了其中 73% 的测试。
+
+这个分工方式和瑞士奶酪模型是一致的：**能被机器判定的部分交给机器做硬保证，不能判定的部分交给人**。
+
+不过要注意，变异分数本身也是一个指标，同样逃不过[古德哈特定律](https://zh.wikipedia.org/wiki/古德哈特定律)。Agent 为了杀死变异体，可能会写出过度绑定实现细节的测试，导致以后任何重构都会让一片测试变红。所以阈值不要设 100%，存活的变异体也允许在 Review 中标注"不值得测"后放行。
+
+## 还有哪些事情可以交给Workflow或CronJob？
+
+上文讲了如何一定程度上去保证测试质量，是因为它诠释了我们需要检查 Agent 有没有真正完成了任务。更进一步来说，除了传统的 Lint、类型检查、单元测试和构建，过去还有一些过去靠人自觉遵守的约束也可以放进 Workflow：
+
+### 测试本身也需要被检查
+
+修 Bug 时，可以借鉴 [SWE-bench](https://www.swebench.com/) 的 **Fail-to-Pass**：回归测试在旧代码上应该能复现问题，在修复后应该通过，原本通过的测试也不能退化。如果新测试在旧代码上照样绿灯，它就没有证明自己测到了这个 Bug；因为缺少新接口而编译失败，也不能算复现成功。
+
+Agent 很容易写出一大坨文档，尤其是 Anthropic 的 Claude 系模型。这件事同样可以机械地约束。DeepSeek Harness 的 `verify doc budgets` 会检查文档行数，为根目录文档和架构文档分别设置预算。OpenAI 则把一开始那个巨大的 `AGENTS.md` 压缩到约 100 行，只作为目录，详细内容放进 `docs/` 按需加载。
+
+这也接着上一讲的文档治理，要求 Agent “保持简洁”以后，还要有办法发现它什么时候不再简洁。行数当然不能衡量文档质量，但可以让无节制的膨胀及时暴露出来，再由人判断哪些内容值得保留。
+
+### 检查结果要能指导下一步
+
+上面的`shipping.go`已经说明，反馈越具体，Agent 越容易修到点上。CI 输出也应该如此：失败的是哪个检查、涉及哪个文件、预期和实际有什么差异，最好能直接读到。比如把 `ERROR` 和原因写在同一行，保留关键上下文，再提供完整日志入口，减少 Agent 在大量输出里猜关键词、反复 `grep` 的成本。
+
+反馈还得稳定。ACH 把“不 Flaky”作为要求，这对 Agent 的迭代也很重要：测试随机变红，会诱导它去改本来正确的代码，或者学会“重跑到绿为止”。需要加快本地迭代时，可以提供只跑部分用例的 `--fast` 模式，但同一轮修复应固定样本，方便比较修改前后的结果；合并前仍按既定规则验证。
+
+运行时的反馈也一样。我给每个Ephemeral Pod都接入了SLS服务，让 Agent 可以自己查日志、查指标，验证启动耗时和关键链路的延迟，对于一个健壮的应用来说能运行只是最基本的要求，更重要的是它的O11y指标埋点如何，是否可以观测它运行得怎么样。
+
+### 发布以后要能发现问题、恢复服务
+
+检查通过也不意味着交付结束。总有问题会漏过去，所以还要安排灰度、观测和回滚。Anthropic 在博客中提到他们会先在内部使用，再按渠道发布，用 Feature Flag 控制新行为，并保留快速回滚的能力。这样发现问题时，就能先缩小影响，再继续修复。
+
+对于个人以及中小团队来说，我们也可以利用`git revert`配合优雅起停来快速恢复服务，再对问题本身进行修复，无需配置完整的Jenkins, Jira这种完整的流水线，只需要让artifact本身具有rollback的能力即可。
+
+### 定期检查整个仓库，也检查流水线本身
+
+事故修好以后，还应该变成下一次检查的依据。Anthropic 把历史上导致事故的 PR、修复和回滚整理成 Reviewer 的评测集，每次修改 Prompt、工具或模型都重新打分。Review 意见和用户报告的 Bug 也可以这样处理：沉淀成回归测试、文档或自动检查，让同一种问题更难再次漏过去。
+
+检查也不必只由提交触发。OpenAI 用后台 Codex 任务定期扫描仓库里的偏差，提交小范围的重构 PR，称之为“垃圾回收”。我们同样可以用 Nightly 或每周的架构 Review，检查整个仓库有没有逐渐偏离约定。Claude/Codex均提供了云端代码的运行能力，我们可以利用这个能力来运行一些定期的检查任务，不必保持电脑时刻开机。
+
+在执行完备的审查过程中我们也要留意 CI 的排队时间和测试时间的增速，Agent 带来的 PR 和测试增长，也会让流水线成为瓶颈，需要持续调整容量和测试策略，定期削减不必要的测试让发布更加健康。
+
+## 后记：让交付速度跟上代码生产速度
+
+在 Pre-LLM 时代，写配置要学 DSL，搭环境要懂容器。对当时的我来说，这笔投入的收益来得很慢，所以它总是"以后再说"。但在2026年一切内容都可以让 Agent 写，哪怕只是一个人的项目，Repo 也会持续高速增长。过去的方式被改写后思维也要被改写，或许对于所有的项目第一步都应该是从后向前思考，当我想做一个东西的时候，第一步想的应该是我应该如何设计它的Benchmark或Test？从这个方向来说，CI/CD 的价值不仅没有降低，反而因为 Agent 的普及而变得更加重要。设计一个健康高效的流水线变成了一个每个Coder都需要有一定理解的概念。

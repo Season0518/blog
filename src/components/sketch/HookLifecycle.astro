@@ -1,0 +1,791 @@
+---
+import Sketch from "./Sketch.astro";
+import { clawd, shapes } from "./hookLifecycle";
+---
+
+<div data-hook-lifecycle>
+  <Sketch
+    width={800}
+    height={600}
+    title="Hook lifecycle: SessionStart, then per turn UserPromptSubmit, the agentic loop (PreToolUse, tool call, PostToolUse) and Stop, followed by the Git layer (pre-commit, commit-msg, pre-push) and CI"
+    caption="一个典型由Coding Agent驱动的开发流程"
+    shapes={shapes}
+  >
+    <g
+      slot="overlay"
+      class="clawd"
+      shape-rendering="crispEdges"
+      aria-hidden="true"
+      data-clawd
+    >
+      <clipPath id="hook-lifecycle-clawd-clip">
+        <rect
+          x={-clawd.width}
+          y={-clawd.height * 4}
+          width={clawd.width * 2}
+          height={clawd.height * 4}></rect>
+      </clipPath>
+      <filter
+        id="hook-lifecycle-clawd-ink"
+        filterUnits="userSpaceOnUse"
+        x="-100"
+        y="-100"
+        width="200"
+        height="200"
+      >
+        <feMorphology
+          in="SourceAlpha"
+          operator="dilate"
+          radius="1"
+          result="spread"></feMorphology>
+        <feFlood class="ink-flood"></feFlood>
+        <feComposite in2="spread" operator="in"></feComposite>
+        <feMerge>
+          <feMergeNode></feMergeNode>
+          <feMergeNode in="SourceGraphic"></feMergeNode>
+        </feMerge>
+      </filter>
+      <g clip-path="url(#hook-lifecycle-clawd-clip)">
+        <g data-react>
+          <g data-crouch>
+            <g class="clawd-bob">
+              {
+                clawd.poses.map(({ pose, rects }) => (
+                  <g
+                    data-pose={pose}
+                    display={pose === "default" ? undefined : "none"}
+                  >
+                    {rects.map(rect => (
+                      <rect
+                        x={rect.x}
+                        y={rect.y}
+                        width={rect.w}
+                        height={rect.h}
+                        class={rect.kind}
+                      />
+                    ))}
+                  </g>
+                ))
+              }
+              {
+                clawd.gear.map(({ activity, parts }) => (
+                  <g data-gear={activity} display="none">
+                    {parts.map(({ name, anchor: [x, y], rects }) => (
+                      <g transform={`translate(${x} ${y})`}>
+                        <g data-part={name} visibility="hidden">
+                          <g class={name}>
+                            {rects.map(rect => (
+                              <rect
+                                x={rect.x}
+                                y={rect.y}
+                                width={rect.w}
+                                height={rect.h}
+                                class={rect.kind}
+                              />
+                            ))}
+                          </g>
+                        </g>
+                      </g>
+                    ))}
+                  </g>
+                ))
+              }
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <div
+      class="mt-3 flex flex-col items-center gap-1 px-4 text-center"
+      data-panel
+      hidden
+    >
+      <p class="text-accent text-xs font-semibold" data-title></p>
+      <p
+        class="[&_code]:bg-muted min-h-[3.5em] max-w-xl text-sm leading-relaxed [&_code]:rounded [&_code]:px-1 [&_code]:text-xs"
+        data-note
+      >
+      </p>
+    </div>
+  </Sketch>
+</div>
+
+<style>
+  .clawd {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .clawd[data-visible] {
+    opacity: 1;
+  }
+
+  .body {
+    fill: #d77757;
+  }
+
+  .eye {
+    fill: #000;
+  }
+
+  .clawd.walking .clawd-bob {
+    animation: clawd-bob 0.15s ease-in-out infinite alternate;
+  }
+
+  .clawd.walking .leg-a {
+    animation: clawd-step 0.3s linear infinite;
+  }
+
+  .clawd.walking .leg-b {
+    animation: clawd-step 0.3s linear -0.15s infinite;
+  }
+
+  .ink-flood {
+    flood-color: var(--foreground);
+  }
+
+  .clawd :is(.hardhat, .hammer, .sparks) {
+    filter: url(#hook-lifecycle-clawd-ink);
+  }
+
+  :global([data-theme="dark"]) .clawd :is(.hardhat, .hammer, .sparks) {
+    filter: none;
+  }
+
+  .arm-l {
+    --dx: 4px;
+  }
+
+  .arm-r {
+    --dx: -4px;
+  }
+
+  .laptop-edge {
+    fill: #8a94a3;
+  }
+
+  .laptop-lid {
+    fill: #d3d8df;
+  }
+
+  .laptop-logo {
+    fill: var(--accent);
+  }
+
+  .laptop-base {
+    fill: #5b6472;
+  }
+
+  .code-bit {
+    fill: var(--accent);
+    opacity: 0;
+  }
+
+  .bit-1 {
+    --i: 1;
+  }
+
+  .bit-2 {
+    --i: 2;
+    fill: var(--sketch-warn);
+  }
+
+  .bit-3 {
+    --i: 3;
+  }
+
+  .hat {
+    fill: #f2b705;
+  }
+
+  .hat-shine {
+    fill: #ffd84d;
+  }
+
+  .hat-shade {
+    fill: #c98f00;
+  }
+
+  .hat-brim {
+    fill: #d99a00;
+  }
+
+  .hammer-head {
+    fill: #9aa3ad;
+  }
+
+  .hammer-edge {
+    fill: #6b7480;
+  }
+
+  .hammer-handle {
+    fill: #8d5a3b;
+  }
+
+  .spark {
+    fill: #ffc83d;
+    opacity: 0;
+  }
+
+  .spark-1 {
+    --dx: -5px;
+    --dy: -7px;
+  }
+
+  .spark-2 {
+    --dx: 1px;
+    --dy: -10px;
+  }
+
+  .spark-3 {
+    --dx: 6px;
+    --dy: -6px;
+  }
+
+  .ink {
+    fill: currentColor;
+  }
+
+  .paper {
+    fill: var(--background);
+  }
+
+  .bubble-dot {
+    fill: var(--accent);
+  }
+
+  .dot-1 {
+    --i: 1;
+  }
+
+  .dot-2 {
+    --i: 2;
+  }
+
+  .dot-3 {
+    --i: 3;
+  }
+
+  .clawd[data-activity="typing"] .arm-l {
+    animation: clawd-type 0.3s step-end infinite;
+  }
+
+  .clawd[data-activity="typing"] .arm-r {
+    animation: clawd-type 0.3s step-end -0.15s infinite;
+  }
+
+  .clawd[data-activity="typing"] .code-bit {
+    animation: clawd-code 1.5s linear calc(var(--i) * -0.5s) infinite;
+  }
+
+  .clawd[data-activity="building"] [data-pose] .arm-r {
+    visibility: hidden;
+  }
+
+  .clawd[data-activity="building"] .hammer {
+    animation: clawd-hammer 0.9s infinite;
+  }
+
+  .clawd[data-activity="building"] .spark {
+    animation: clawd-spark 0.9s infinite;
+  }
+
+  .clawd[data-activity="thinking"] .bubble-dot {
+    animation: clawd-dot 1.2s step-end calc(var(--i) * 0.3s - 1.2s) infinite;
+  }
+
+  @keyframes clawd-bob {
+    to {
+      transform: translateY(-1.5px);
+    }
+  }
+
+  @keyframes clawd-step {
+    0%,
+    49.9% {
+      transform: translateY(0);
+    }
+    50%,
+    100% {
+      transform: translateY(-3px);
+    }
+  }
+
+  @keyframes clawd-type {
+    50% {
+      transform: translate(var(--dx), 3px);
+    }
+  }
+
+  @keyframes clawd-code {
+    0% {
+      opacity: 0;
+      transform: none;
+    }
+    15%,
+    60% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translate(calc((var(--i) - 2) * 8px), -22px);
+    }
+  }
+
+  @keyframes clawd-hammer {
+    0%,
+    100% {
+      transform: rotate(15deg);
+    }
+    40% {
+      transform: rotate(-30deg);
+      animation-timing-function: ease-in;
+    }
+    62% {
+      transform: rotate(105deg);
+    }
+    72% {
+      transform: rotate(92deg);
+    }
+  }
+
+  @keyframes clawd-spark {
+    0%,
+    61% {
+      opacity: 0;
+      transform: none;
+    }
+    62% {
+      opacity: 1;
+      transform: none;
+    }
+    90%,
+    100% {
+      opacity: 0;
+      transform: translate(var(--dx), var(--dy));
+    }
+  }
+
+  @keyframes clawd-dot {
+    50% {
+      opacity: 0.25;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .clawd.walking :is(.clawd-bob, .leg),
+    .clawd[data-activity] :is(.arm, .code-bit, .hammer, .spark, .bubble-dot) {
+      animation: none;
+    }
+  }
+</style>
+
+<script>
+  import {
+    activities,
+    clawd,
+    markBadges,
+    scenario,
+    shapes,
+    type Activity,
+    type ClawdPose,
+    type ScenarioStep,
+    type StepMark,
+  } from "./hookLifecycle";
+  import type { Point } from "./types";
+
+  type Frame = [pose: ClawdPose, crouched: boolean];
+
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const WALK_SPEED = 0.16;
+  const HOP_MS = 380;
+  const FRAME_MS = 60;
+  const WORK_MS = 1400;
+
+  const hold = (pose: ClawdPose, crouched: boolean, frames: number): Frame[] =>
+    Array.from({ length: frames }, () => [pose, crouched]);
+
+  // Frame sequences follow Claude Code's AnimatedClawd: crouch then spring
+  // up with both arms raised (twice), or glance right then left.
+  const JUMP_WAVE = [
+    ...hold("default", true, 2),
+    ...hold("arms-up", false, 3),
+    ...hold("default", false, 1),
+    ...hold("default", true, 2),
+    ...hold("arms-up", false, 3),
+    ...hold("default", false, 1),
+  ];
+  const LOOK_AROUND = [
+    ...hold("look-right", false, 5),
+    ...hold("look-left", false, 5),
+    ...hold("default", false, 1),
+  ];
+  const DUCK = [...hold("default", true, 8), ...hold("default", false, 1)];
+  const SHAKE = [0, -5, 5, -4, 4, -2, 0].map(x => ({
+    transform: `translateX(${x}px)`,
+  }));
+
+  const POP: Keyframe[] = [
+    { transform: "scale(0)" },
+    { transform: "scale(1.2)", offset: 0.6 },
+    { transform: "none" },
+  ];
+  const entrances: Record<
+    string,
+    { pose: ClawdPose; duration: number; keyframes: Keyframe[] }
+  > = {
+    laptop: {
+      pose: "default",
+      duration: 360,
+      keyframes: [
+        { transform: "translateY(16px)" },
+        { transform: "translateY(-2px)", offset: 0.7 },
+        { transform: "none" },
+      ],
+    },
+    hardhat: {
+      pose: "arms-up",
+      duration: 480,
+      keyframes: [
+        { transform: "translateY(-20px)", opacity: 0 },
+        { transform: "translateY(-12px)", opacity: 1, offset: 0.3 },
+        { transform: "translateY(1px)", offset: 0.8 },
+        { transform: "none", opacity: 1 },
+      ],
+    },
+    hammer: { pose: "default", duration: 280, keyframes: POP },
+    "puff-small": { pose: "look-right", duration: 160, keyframes: POP },
+    "puff-big": { pose: "look-right", duration: 160, keyframes: POP },
+    bubble: { pose: "look-right", duration: 280, keyframes: POP },
+  };
+  const gearPoses = new Map(
+    clawd.gear.map(({ activity, pose }) => [activity, pose])
+  );
+
+  const celebrate = new Set(["session"]);
+
+  const boxes = new Map<string, { x: number; y: number; w: number }>();
+  const arrows = new Map<string, Point[]>();
+  for (const shape of shapes) {
+    if (shape.id && shape.type === "box") boxes.set(shape.id, shape);
+    if (shape.id && shape.type === "arrow") arrows.set(shape.id, shape.points);
+  }
+
+  const spot = (id: string): Point => {
+    const box = boxes.get(id)!;
+    return [box.x + 30, box.y + 1];
+  };
+  const translate = ([x, y]: Point) => `translate(${x}px, ${y}px)`;
+  const distance = ([x0, y0]: Point, [x1, y1]: Point) =>
+    Math.hypot(x1 - x0, y1 - y0);
+  const dwell = (note: string) => Math.min(5000, 1000 + note.length * 15);
+
+  const renderNote = (target: HTMLElement, text: string) =>
+    target.replaceChildren(
+      ...text.split("`").map((part, i) => {
+        if (i % 2 === 0) return document.createTextNode(part);
+        const code = document.createElement("code");
+        code.textContent = part;
+        return code;
+      })
+    );
+
+  const cleanups = new Set<() => void>();
+
+  function setup(root: HTMLElement) {
+    if (root.dataset.ready) return;
+    root.dataset.ready = "true";
+
+    const figure = root.querySelector<HTMLElement>(".sketch")!;
+    const svg = figure.querySelector("svg")!;
+    const sprite = svg.querySelector<SVGGElement>("[data-clawd]")!;
+    const reactEl = sprite.querySelector<SVGGElement>("[data-react]")!;
+    const crouch = sprite.querySelector<SVGGElement>("[data-crouch]")!;
+    const poses = [...sprite.querySelectorAll<SVGGElement>("[data-pose]")];
+    const gearGroups = new Map(
+      [...sprite.querySelectorAll<SVGGElement>("[data-gear]")].map(g => [
+        g.dataset.gear as Activity,
+        g,
+      ])
+    );
+    const panel = root.querySelector<HTMLElement>("[data-panel]")!;
+    const title = panel.querySelector<HTMLElement>("[data-title]")!;
+    const note = panel.querySelector<HTMLElement>("[data-note]")!;
+    const groups = new Map(
+      [...svg.querySelectorAll<SVGGElement>("g[data-id]")].map(g => [
+        g.dataset.id!,
+        g,
+      ])
+    );
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    const abortable = <T,>(
+      executor: (resolve: (value: T) => void) => () => void
+    ) =>
+      new Promise<T>((resolve, reject) => {
+        const onAbort = () => {
+          dispose();
+          reject(signal.reason);
+        };
+        const dispose = executor(value => {
+          signal.removeEventListener("abort", onAbort);
+          resolve(value);
+        });
+        signal.addEventListener("abort", onAbort, { once: true });
+      });
+
+    const sleep = (ms: number) =>
+      abortable<void>(resolve => {
+        const timer = setTimeout(resolve, ms);
+        return () => clearTimeout(timer);
+      });
+
+    let visible = false;
+    let wake: (() => void) | undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        visible = entry.isIntersecting;
+        if (visible) wake?.();
+      },
+      { threshold: 0.3 }
+    );
+    observer.observe(svg);
+    const waitVisible = () =>
+      visible
+        ? Promise.resolve()
+        : abortable<void>(resolve => {
+            wake = resolve;
+            return () => (wake = undefined);
+          });
+
+    const run = (
+      element: Element,
+      keyframes: Keyframe[],
+      options: KeyframeAnimationOptions
+    ) => {
+      if (reduceMotion.matches) return Promise.resolve();
+      const animation = element.animate(keyframes, options);
+      return abortable<void>(resolve => {
+        animation.finished.then(
+          () => resolve(),
+          () => {}
+        );
+        return () => animation.cancel();
+      });
+    };
+
+    const pose = (name: ClawdPose, crouched = false) => {
+      for (const group of poses) {
+        if (group.dataset.pose === name) group.removeAttribute("display");
+        else group.setAttribute("display", "none");
+      }
+      crouch.style.transform = crouched ? `translateY(${clawd.crouch}px)` : "";
+    };
+
+    const perform = async (frames: Frame[]) => {
+      if (reduceMotion.matches) return;
+      for (const frame of frames) {
+        pose(...frame);
+        await sleep(FRAME_MS);
+      }
+    };
+
+    let worn: Activity | undefined;
+    const parts = (activity: Activity) => [
+      ...gearGroups.get(activity)!.querySelectorAll<SVGGElement>("[data-part]"),
+    ];
+
+    const animatePart = async (
+      part: SVGGElement,
+      direction: PlaybackDirection
+    ) => {
+      const entrance = entrances[part.dataset.part!];
+      if (direction === "normal") part.removeAttribute("visibility");
+      if (entrance) {
+        pose(entrance.pose);
+        await run(part, entrance.keyframes, {
+          duration: entrance.duration,
+          easing: "ease-out",
+          direction,
+        });
+      }
+      if (direction === "reverse") part.setAttribute("visibility", "hidden");
+    };
+
+    const unequip = async () => {
+      if (!worn) return;
+      delete sprite.dataset.activity;
+      for (const part of parts(worn).reverse()) {
+        await animatePart(part, "reverse");
+      }
+      gearGroups.get(worn)!.setAttribute("display", "none");
+      worn = undefined;
+      pose("default");
+    };
+
+    const equip = async (activity: Activity) => {
+      if (worn === activity) return;
+      await unequip();
+      worn = activity;
+      gearGroups.get(activity)!.removeAttribute("display");
+      for (const part of parts(activity)) await animatePart(part, "normal");
+      sprite.dataset.activity = activity;
+      pose(gearPoses.get(activity)!);
+    };
+
+    let position: Point = [0, 0];
+    const place = (point: Point) => {
+      position = point;
+      sprite.style.transform = translate(point);
+    };
+
+    const hop = (to: Point) => {
+      pose("default");
+      const [x0, y0] = position;
+      const [x1, y1] = to;
+      const height = 16 + distance(position, to) * 0.15;
+      const frames = Array.from({ length: 9 }, (_, i) => {
+        const t = i / 8;
+        const lift = 4 * height * t * (1 - t);
+        return {
+          transform: translate([x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - lift]),
+        };
+      });
+      place(to);
+      return run(sprite, frames, { duration: HOP_MS, easing: "ease-in-out" });
+    };
+
+    const walk = async (points: Point[]) => {
+      pose("default");
+      const route = [position, ...points];
+      const lengths = route.slice(1).map((p, i) => distance(route[i], p));
+      const total = lengths.reduce((sum, length) => sum + length, 0);
+      let travelled = 0;
+      const frames = route.map((point, i) => {
+        travelled += i > 0 ? lengths[i - 1] : 0;
+        return { transform: translate(point), offset: travelled / total };
+      });
+      place(points.at(-1)!);
+      sprite.classList.add("walking");
+      try {
+        await run(sprite, frames, { duration: total / WALK_SPEED });
+      } finally {
+        sprite.classList.remove("walking");
+      }
+    };
+
+    const showBadge = (id: string, mark: StepMark) => {
+      const box = boxes.get(id)!;
+      const badge = document.createElementNS(SVG_NS, "text");
+      badge.setAttribute("class", "sketch-badge");
+      badge.setAttribute("x", String(box.x + box.w - 8));
+      badge.setAttribute("y", String(box.y + 5));
+      badge.setAttribute("text-anchor", "end");
+      badge.dataset.state = mark;
+      badge.textContent = markBadges[mark];
+      svg.append(badge);
+    };
+
+    const react = async (mark: StepMark) => {
+      if (mark === "pass") await perform(JUMP_WAVE);
+      else if (mark === "warn") await perform(LOOK_AROUND);
+      else {
+        await Promise.all([
+          perform(DUCK),
+          run(reactEl, SHAKE, { duration: DUCK.length * FRAME_MS }),
+        ]);
+      }
+    };
+
+    const arrive = async (id: string, step: ScenarioStep, last: boolean) => {
+      const mark = step.marks?.[id];
+      const activity = activities[id];
+      if (activity) {
+        await equip(activity);
+        if (last && !mark) return;
+        await sleep(WORK_MS);
+        if (mark) await unequip();
+      }
+      if (mark) {
+        groups.get(id)!.dataset.state = mark;
+        showBadge(id, mark);
+        await react(mark);
+      } else if (celebrate.has(id)) await perform(JUMP_WAVE);
+      else if (id === "prompt") await perform(LOOK_AROUND);
+    };
+
+    const highlight = (step: ScenarioStep, trail: Set<string>) => {
+      svg.querySelectorAll(".sketch-badge").forEach(badge => badge.remove());
+      for (const [id, g] of groups) {
+        const state = step.path.includes(id)
+          ? "active"
+          : trail.has(id)
+            ? "visited"
+            : undefined;
+        if (state) g.dataset.state = state;
+        else g.removeAttribute("data-state");
+      }
+    };
+
+    const playStep = async (step: ScenarioStep) => {
+      for (const [index, id] of step.path.entries()) {
+        await unequip();
+        const line = arrows.get(id);
+        if (line) {
+          if (distance(position, line[0]) > 6) await hop(line[0]);
+          await walk(line.slice(1));
+        } else {
+          await hop(spot(id));
+          await arrive(id, step, index === step.path.length - 1);
+        }
+      }
+    };
+
+    const loop = async () => {
+      figure.dataset.playing = "";
+      panel.hidden = false;
+      title.textContent = scenario.label;
+      for (;;) {
+        const [first] = scenario.steps[0].path;
+        const trail = new Set<string>();
+        await waitVisible();
+        place(arrows.get(first)?.[0] ?? spot(first));
+        sprite.dataset.visible = "";
+        for (const step of scenario.steps) {
+          await waitVisible();
+          renderNote(note, step.note);
+          highlight(step, trail);
+          await playStep(step);
+          await sleep(dwell(step.note));
+          step.path.forEach(id => trail.add(id));
+        }
+        await unequip();
+        await sleep(600);
+        delete sprite.dataset.visible;
+        pose("default");
+        await sleep(500);
+      }
+    };
+
+    loop().catch(error => {
+      if (!signal.aborted) throw error;
+    });
+    cleanups.add(() => {
+      controller.abort();
+      observer.disconnect();
+    });
+  }
+
+  document.addEventListener("astro:page-load", () =>
+    document
+      .querySelectorAll<HTMLElement>("[data-hook-lifecycle]")
+      .forEach(setup)
+  );
+  document.addEventListener("astro:before-swap", () => {
+    cleanups.forEach(cleanup => cleanup());
+    cleanups.clear();
+  });
+</script>

@@ -1,0 +1,15 @@
+---
+import { getCollection } from "astro:content";
+import { getPostUrl } from "@/utils/getPostPaths";
+
+export async function getStaticPaths() {
+  return (await getCollection("posts"))
+    .filter(post => post.data.legacyPath)
+    .map(post => ({
+      params: { legacy: post.data.legacyPath },
+      props: { url: getPostUrl(post.id, post.filePath) },
+    }));
+}
+
+return Astro.redirect(encodeURI(Astro.props.url), 301);
+---

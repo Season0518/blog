@@ -1,0 +1,51 @@
+---
+import IconArrowRight from "@/assets/icons/IconArrowRight.svg";
+
+interface Props {
+  links: {
+    name: string;
+    url: string;
+    description?: string;
+  }[];
+}
+
+const { links } = Astro.props;
+---
+
+<ul
+  class="not-prose my-6 grid list-none grid-cols-2 gap-3 overflow-visible p-0"
+  role="list"
+  aria-label="友链"
+>
+  {
+    links.map(({ name, url, description }) => (
+      <li class="m-0 min-w-0 p-0">
+        <a
+          href={url}
+          target="_blank"
+          rel="friend noopener noreferrer"
+          class="border-border bg-muted/25 hover:border-accent focus-visible:border-accent flex h-full items-start justify-between gap-2 rounded-sm border p-3 no-underline sm:gap-4 sm:p-4"
+        >
+          <span class="min-w-0">
+            <span class="text-accent block font-medium wrap-break-word">
+              {name}
+            </span>
+            <span class="text-muted-foreground mt-1 block text-sm wrap-anywhere">
+              {new URL(url).hostname}
+            </span>
+            {description && (
+              <span class="text-foreground mt-2 block text-sm">
+                {description}
+              </span>
+            )}
+          </span>
+          <IconArrowRight
+            class="text-accent mt-1 size-5 shrink-0 -rotate-45"
+            aria-hidden="true"
+          />
+          <span class="sr-only">（在新标签页打开）</span>
+        </a>
+      </li>
+    ))
+  }
+</ul>

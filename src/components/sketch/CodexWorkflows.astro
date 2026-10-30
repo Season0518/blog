@@ -1,0 +1,105 @@
+---
+import Sketch from "./Sketch.astro";
+import type { Point, SketchShape } from "./types";
+
+// Main entrypoints at openai/codex@c15d0ce323f2197da865871502dc6ea7ef5b8ddb.
+// Language and tool details are abstracted into their existing CI/CD roles.
+const text = (
+  x: number,
+  y: number,
+  value: string,
+  size = 14,
+  muted = false,
+  anchor: "start" | "middle" = "start"
+): SketchShape => ({ type: "text", x, y, text: value, size, muted, anchor });
+
+const box = (
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  label: string,
+  sub?: string,
+  accent = false
+): SketchShape => ({
+  type: "box",
+  x,
+  y,
+  w,
+  h,
+  label,
+  sub,
+  tone: accent ? "accent" : "plain",
+});
+
+const arrow = (...points: Point[]): SketchShape => ({ type: "arrow", points });
+const frame = (y: number, h: number, label: string): SketchShape => ({
+  type: "frame",
+  x: 214,
+  y,
+  w: 360,
+  h,
+  label,
+});
+
+const shapes: SketchShape[] = [
+  text(24, 30, "Codex / CI to delivery", 26),
+  text(24, 56, "Three entrypoints, different jobs to do.", 15, true),
+
+  text(24, 92, "01  BEFORE MERGE", 16),
+  frame(110, 208, "Required checks / run in parallel"),
+  box(24, 184, 156, 68, "Pull request", "merge candidate"),
+  arrow([182, 218], [210, 218]),
+  box(232, 148, 152, 58, "Code checks", "format / lint"),
+  box(402, 148, 154, 58, "Tests + build", "verify the change"),
+  box(232, 222, 324, 72, ""),
+  text(394, 245, "Project rules", 18, false, "middle"),
+  text(394, 266, "repository / dependencies", 13, true, "middle"),
+  text(394, 284, "package checks", 13, true, "middle"),
+  arrow([578, 218], [604, 218]),
+  box(608, 184, 168, 68, "Merge gate", "required checks pass", true),
+  text(24, 342, "Check the merge candidate; keep feedback fast.", 14, true),
+
+  text(24, 382, "02  AFTER MERGE", 16),
+  box(24, 452, 156, 68, "Push to main", "merged commit"),
+  arrow([182, 486], [198, 486], [198, 434], [228, 434]),
+  box(232, 405, 324, 58, "Re-run shared checks", "verify the merged commit"),
+  arrow([560, 434], [604, 434]),
+  box(608, 405, 168, 58, "Check results", "same check family", true),
+  arrow([198, 486], [198, 570], [210, 570]),
+  frame(486, 168, "Broader verification"),
+  box(232, 524, 324, 60, "Full validation", "tests / lint / release builds"),
+  text(394, 609, "Across supported environments", 13, true, "middle"),
+  text(394, 635, "+ extra checks for relevant changes", 15, false, "middle"),
+  arrow([578, 570], [604, 570]),
+  box(608, 536, 168, 68, "CI results", "postmerge report"),
+  text(
+    24,
+    678,
+    "Broader coverage after merge; keep the PR feedback loop short.",
+    14,
+    true
+  ),
+
+  text(24, 718, "03  TAGGED RELEASE", 16),
+  box(24, 794, 156, 68, "Release tag", "versioned commit"),
+  arrow([182, 828], [210, 828]),
+  frame(744, 180, "Release workflow"),
+  box(232, 780, 324, 58, "Validate + build", "version / target environments"),
+  arrow([394, 840], [394, 855]),
+  box(232, 860, 324, 48, "Sign + verify + package"),
+  arrow([578, 828], [604, 828]),
+  box(608, 794, 168, 68, "Release", "verified artifacts", true),
+  arrow([692, 865], [692, 882]),
+  text(692, 901, "Publish packages", 14, false, "middle"),
+  text(692, 922, "release channels", 13, true, "middle"),
+];
+---
+
+<Sketch
+  width={800}
+  height={940}
+  title="Codex CI/CD framework: pull requests run code checks, tests, builds, and project rules before the merge gate. Pushes to main rerun shared checks and add broader validation across supported environments. Release tags trigger version validation, builds, signing, verification, packaging, and distribution."
+  caption="CI/CD framework · adapted from openai/codex @ c15d0ce"
+  shapes={shapes}
+/>

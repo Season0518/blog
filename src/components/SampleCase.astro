@@ -1,0 +1,26 @@
+---
+interface Props {
+  number: number;
+  input: string;
+  output: string;
+}
+const { number, input, output } = Astro.props;
+---
+
+<section
+  class="not-prose my-4 grid min-w-0 gap-4 sm:grid-cols-2"
+  aria-label={`样例 ${number}`}
+>
+  {
+    [
+      { label: "输入", text: input },
+      { label: "输出", text: output },
+    ].map(({ label, text }) => (
+      <div class="min-w-0">
+        <p class="text-muted-foreground mb-3 text-sm font-medium">{label}</p>
+        {/* prettier-ignore */}
+        <pre class="sample-source border-border bg-muted/25 overflow-x-auto border p-4 text-sm leading-7 whitespace-pre" tabindex="0" aria-label={`样例 ${number} ${label}`}><code class="block bg-transparent! p-0!">{text}</code></pre>
+      </div>
+    ))
+  }
+</section>

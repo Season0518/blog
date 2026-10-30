@@ -1,0 +1,49 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import Socials from "./Socials.astro";
+import config from "@/config";
+import { useTranslations } from "@/i18n";
+
+type Props = {
+  noMarginTop?: boolean;
+} & HTMLAttributes<"footer">;
+
+const { noMarginTop = false, class: className, ...attrs } = Astro.props;
+
+const t = useTranslations(Astro.currentLocale);
+const currentYear = new Date().getFullYear();
+---
+
+<footer
+  class:list={["app-layout", { "mt-auto": !noMarginTop }, className]}
+  {...attrs}
+>
+  <div
+    class="border-border flex flex-col items-center justify-between gap-3 border-t py-6 sm:flex-row-reverse sm:items-start sm:py-4"
+  >
+    <Socials />
+    <div
+      class="flex min-w-0 flex-col items-center gap-2 text-center sm:items-start sm:text-left"
+    >
+      <div
+        class="flex flex-col items-center gap-x-4 gap-y-1 text-sm sm:flex-row sm:flex-wrap"
+      >
+        <span
+          >{t.footer.copyright} &#169; {currentYear} {config.site.author}</span
+        >
+      </div>
+      {
+        import.meta.env.MODE === "cn" && config.site.icpNumber && (
+          <a
+            href="https://beian.miit.gov.cn/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-foreground/70 hover:text-accent text-xs underline-offset-4 hover:underline"
+          >
+            {config.site.icpNumber}
+          </a>
+        )
+      }
+    </div>
+  </div>
+</footer>

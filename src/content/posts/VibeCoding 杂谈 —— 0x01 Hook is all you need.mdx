@@ -1,0 +1,364 @@
+---
+title: VibeCoding 杂谈 —— 0x01 Hook is all you need
+pubDatetime: 2026-10-30T12:00:01+08:00
+description: 利用 Hook 去替换掉大段的 AGENT.MD
+draft: false
+categories:
+  - VibeCoding
+tags:
+  - VibeCoding
+  - AI
+  - Agent
+  - Hook
+---
+
+import HookLifecycle from '@/components/sketch/HookLifecycle.astro';
+
+在 2026 年的下半年，`VibeCoding` 似乎已经是一个每个人都知道的 Concept，无论是否为从业者，都可以通过自然语言配合形如 Trae、Codex 等 Agent 工具来完成各种各样的编程任务。但自然语言编程天生具有**不确定性**，很多人为了针对大模型的胡言乱语或过度防御会尝试在`AGENT.MD`或提示词中反复的强调不要做某些事，但是AI还会去做，由此得出一个推论：AI是个弱智。这显然是片面的。
+
+`AGENTS.md` 是其实只是预制的上下文而已。Claude Code 的[官方文档](https://code.claude.com/docs/en/memory)写得很直白：`CLAUDE.md` 被当作上下文而不是强制配置（context, not enforced configuration），它以一条用户消息的形式跟在系统提示词之后，模型会尽量遵守，但并不保证严格执行；HumanLayer 在 [Writing a good CLAUDE.md](https://www.humanlayer.dev/blog/writing-a-good-claude-md) 中抓包发现，Claude Code 还会给这段内容套上一层 `<system-reminder>`，提示模型"这段上下文可能与当前任务无关，除非高度相关否则不必回应"——也就是说，**模型本来就被允许忽略你**。
+
+ETH Zurich 的 [Evaluating AGENTS.md](https://arxiv.org/abs/2602.11988) 中提到，无论是 LLM 生成的还是开发者手写的上下文文件，整体上都没有提升任务成功率，推理成本却平均增加了 20% 以上。其中被模型认真执行的是具体的工具指令（例如“使用 `uv`”），而大段的仓库概览几乎毫无帮助。
+
+所以提示词本身并不能可靠的解决所有问题。Thomas Wiegold 在 [Claude Code Hooks](https://thomas-wiegold.com/blog/claude-code-hooks/) 一文中给过一个很好用的判断标准：
+
+> 如果你正在 `AGENTS.md` 里写"必须总是……"或"绝不能……"，那它就应该是一个 Hook；如果写的是"做 X 时优先 Y"，那它才属于提示词或 Skill。
+
+所以本文将会展开一些 Hook 在实际开发中的应用。
+
+## 什么是 Hook
+
+Hook 是 Agent在LifeCycle上执行的一段确定性程序。以 Claude Code 为例，[官方文档](https://code.claude.com/docs/en/hooks)将其定义为"在生命周期特定节点上自动执行的用户自定义 shell 命令、HTTP 端点、MCP 工具、LLM 提示词或子代理"。如果你用过 Git Hook，那么这个事情对你来说并不陌生：把脚本挂在一个已知的事件上，每次走到这里，脚本就一定会执行。
+
+### 架构
+
+官方文档按触发频率把事件分为三类：每个会话一次（`SessionStart`、`SessionEnd`）、每一轮一次（`UserPromptSubmit`、`Stop`），以及 Agentic Loop 中每次工具调用一次（`PreToolUse`、`PostToolUse`）。Claude Code 目前已有三十余个事件，但正如 Thomas 所说，九成的场景只需要 `PreToolUse`、`PostToolUse` 和 `Stop` 这三个。再加上 Git 与 CI 两层兜底，整条链路大致如下：
+
+<HookLifecycle />
+
+## 如何应用 Hooks 来简化 AGENTS.md
+
+来看一段 `AGENTS.md` 中典型的案例，原 `AGENTS.md` 约为 $5.7$k Token，我们节选一部分。
+
+``` markdown
+## 3. 安全与数据红线
+
+- 密码、Token、私钥、Cookie、真实地址和用户数据不得进入 Git、公开文档、截图、日志或提交信息。
+- 示例统一使用占位值、`example.com` 和 RFC 5737 地址。
+- 只在任务确实需要时读取凭据；不得输出凭据正文或把含凭据的命令暴露到日志。
+- 不得主动结束、删除或修改无法确认属于本项目的进程、服务、会话、文件、端口或远端资源。
+- 删除、覆盖、迁移、重置和批量写入前必须解析并核验精确目标；不确定时失败关闭。
+- 用户数据删除必须覆盖所有约定作用域，并防止缓存、索引、旧窗口或异步任务复活数据。
+- 高风险操作必须有权限校验、明确确认、审计记录、失败可见性和恢复策略。
+- 不降低系统安全设置，不关闭安全软件，不绕过签名、证书或主机身份校验。
+
+## 4. 工作方式
+
+- 开始前先确认交付物、允许修改范围、直接阻断项和完成证据。
+- 只读分析、诊断或审查不授权修改代码、外部系统或发布状态。
+- 实现任务应直接修复根因，并删除被替代的错误路径；禁止用吞错、无依据重试、旁路或重复实现掩盖问题。
+- 不扩大范围：旁支问题仅在会造成安全、数据丢失或直接阻断交付时纳入本轮。
+- 已通过且未受相关变化影响的测试或构建可复用，不反复审计同一对象。
+- 复杂任务先拆分计划；独立且写入不重叠的工作可并行，主任务负责最终集成和验证。
+- 子任务必须写明范围、文件、约束和预期输出；回报后必须复核，不只转述结论。
+- 后台任务运行时继续推进不冲突工作，并定期向用户提供简短进展。
+- 优先使用不抢占用户桌面的命令、API和后台自动化。
+
+## 5. 文件与代码修改纪律
+
+- 修改前先读取目标文件、相邻实现、测试和最近的项目说明。
+- 使用精确补丁修改文件；不覆盖用户已有改动，不回滚无关 diff。
+- 一文件一职责；新增功能优先建立职责明确的新模块。
+- 单文件建议上限：`[例如 500 行]`；超过上限先按真实职责拆分，禁止压行规避。
+- 注释解释"为什么"和边界，不复述代码；语言要求为 `[中文 / 英文 / 跟随现有风格]`。
+- 错误必须结构化并向调用链可见，禁止散落字符串和静默成功。
+- 数据库写入涉及多个相关状态时使用单一事务，并验证回滚、幂等和并发冲突。
+- 外部输入、序列化、路径、大小和资源消耗必须有边界校验。
+- 不新增未使用依赖、重复工具、临时脚本或无所有者的通用框架。
+```
+
+显然这段规则`几乎都可以`转换为 Hook。这里将其中的规则按照特征只有两类：
+
+| 类型 | 特征 |
+| --- | --- |
+| 约束 | 有明确的"是/否"判定标准  |
+| 偏好 | 与项目领域上下文无关  |
+
+这里其实也是我平时一直在说的问题，哪些问题是well-defined的问题呢？如果对于一个封闭的问题，那么交给Agent来实现大概率效果其实是不错的。所以我们可以重新去思考一下：“我的问题是否可以转换成可以量化的问题？”
+
+### 硬约束：确定性 Hook 直接拦截
+
+```markdown
+- 密码、Token、私钥、Cookie、真实地址和用户数据不得进入 Git、公开文档、截图、日志或提交信息。
+- 只在任务确实需要时读取凭据；不得输出凭据正文或把含凭据的命令暴露到日志。
+- 不降低系统安全设置，不关闭安全软件，不绕过签名、证书或主机身份校验。
+- 不新增未使用依赖、重复工具、临时脚本或无所有者的通用框架。
+```
+
+这是注入点为 `PreToolUse` 的标准案例：**明确可以拒绝的指令，一定可以用 Hook 实现**。例如密钥扫描可以接入 gitleaks 一类的工具，未使用依赖可以交给 `go mod tidy` 后的 diff 检查，读取凭据文件可以在 PreToolUse 中按路径拦截。
+
+
+### 软约束：LLM + 单一 Skill 验收
+
+```markdown
+- 注释解释"为什么"和边界，不复述代码；语言要求为 `[中文 / 英文 / 跟随现有风格]`。
+```
+注入点同样是 Hook，但对于没有绝对指标来量化的规则，我们可以使用 LLM 的能力配合**单一职责的 Skill** 来进行验收：Hook 只负责"在什么时候触发审查"，Skill 只负责"怎么审查这一件事"。
+
+和把规则写在 `AGENTS.md` 里相比，区别在于：审查是在一个**干净、聚焦的上下文**里进行的，不会被前面几十轮对话稀释。
+
+### 伪约束：用指标代替数字
+
+```markdown
+- 一文件一职责；新增功能优先建立职责明确的新模块。
+- 单文件建议上限：`[例如 500 行]`；超过上限先按真实职责拆分，禁止压行规避。
+```
+
+个人认为这是最差的一条，文件的大小不应该被机械性地截断。不希望出现大文件真正想解决的问题是降低软件的**维护成本**，而行数只是一个很片面的指标，因为它会让模型单纯为了遵循这条指令去做出不必要的拆分。
+
+我们可以在 `PreToolUse` 前去动态评估一段代码的真实维护成本，例如 CRAP（Change Risk Anti-Patterns）指标：
+
+$$
+\mathrm{CRAP}(m) = \mathrm{comp}(m)^2 \times \left(1 - \frac{\mathrm{cov}(m)}{100}\right)^3 + \mathrm{comp}(m)
+$$
+
+其中 $\mathrm{comp}(m)$ 为方法的圈复杂度，$\mathrm{cov}(m)$ 为测试覆盖率（百分比）。复杂度越高、测试越少，分数越高。
+
+除了 CRAP 以外，我们也有认知复杂度（Cognitive Complexity）、可维护性指数（Maintainability Index）等其他指标，Go 生态里可以直接使用 `gocyclo`、`gocognit` 或 golangci-lint 中对应的 linter。当你遵循了这些指标以后，单文件自然不会很大；即使有大文件，理解起来的难度也是相对较低的。
+
+### 偏好：尽量删掉
+
+```markdown
+- 后台任务运行时继续推进不冲突工作，并定期向用户提供简短进展。
+- 优先使用不抢占用户桌面的命令、API和后台自动化。
+```
+
+这些规则站在个人角度来说是冗余的。为什么？这些内容与项目领域上下文无关，属于偏好类。
+
+- 对于软需求，我们可以直接交给 Agent 来决定。
+- 对于安全性需求，我们可以配置好 Devcontainer 或其他沙箱环境，从环境层面限制它能做什么，而不是靠提示词"请求"它不要做什么。
+
+所以对于 Agentic Coding 来说，这些是纯粹的噪音，尽可能让它完成任务即可。而且它还会占用宝贵的上下文空间。
+
+### 精简后的 AGENTS.md
+
+经过上面的拆分，硬约束交给了 Hook，伪约束交给了指标，偏好交给了 Agent 和沙箱，剩下真正需要模型"理解"的只有寥寥几条：
+
+```markdown
+## 安全与授权
+
+- 仅在当前任务授权范围内操作，遵循最小权限原则。
+- 无法确认资源归属、权限或操作影响时，不得擅自执行。
+- 高风险操作优先采用可恢复方案，不得绕过安全控制。
+
+## 任务执行
+
+- 明确任务目标、允许变更的范围及完成标准。
+- 只读任务不得擅自转为修改任务。
+- 优先解决问题根因，不以临时旁路替代正确实现。
+- 遵循最小必要变更原则，不主动扩大任务范围。
+- 修改前理解相关实现，保护用户已有变更。
+```
+
+从约 5.7k Tokens 精简到了 140 Tokens 左右。
+
+## 三、实战案例
+
+那么来看一下来自真实项目中的 Hooks 实践。
+
+### 确保 Go 代码经过 hz 与 kitex 生成
+
+**问题**：项目使用 Hertz（`hz`）与 Kitex（`kitex`）基于 IDL 生成 HTTP / RPC 代码。模型经常会修改了 IDL 却没有重新运行code-gen工具生成新代码，或者干脆跳过 IDL 直接手写 Handler 和结构体，导致 IDL 与代码脱节。
+
+**设计**：**PostToolUse**：修改后端 `.thrift` / `.proto` 后，自动执行生成与编译检查，并把诊断反馈给模型。示例中的 `gen-idl` 封装 `hz update` / `kitex`，`check-generated` 检查生成后的代码能否编译，在commit前以暂存区快照为输入，在临时目录重跑同一套生成与编译流程，再比较产物。存在差异、缺失文件或生成失败，均拒绝提交。
+
+```bash
+#!/usr/bin/env bash
+# .claude/hooks/regen-idl.sh —— PostToolUse，matcher: Edit|Write
+
+file=$(jq -r '.tool_input.file_path // empty') || exit 2
+file=${file#"$CLAUDE_PROJECT_DIR"/}
+
+case "$file" in
+  backend/idl/*.thrift | backend/idl/*.proto) ;;
+  *) exit 0 ;;
+esac
+
+cd "$CLAUDE_PROJECT_DIR" || exit 2
+
+{
+  make gen-idl &&
+    make check-generated
+} >&2 || exit 2
+```
+
+提交前的入口同样只负责调度：
+
+```bash
+#!/usr/bin/env bash
+# .git/hooks/pre-commit
+
+root=$(git rev-parse --show-toplevel) || exit 1
+cd "$root" || exit 1
+make check-staged-generated >&2 || exit 1
+```
+
+### 锁定样板代码
+
+**问题**：生成出来的代码同样会被模型"顺手"改掉，如果被改掉的代码可能会无法再次修改或更新，又或者是被直接替换，这类问题是破坏面最严重的一类。
+
+**设计**：Go 社区约定生成文件的头部带有 `// Code generated ... DO NOT EDIT.`。在 PreToolUse 阶段读取已有目标文件，发现标记就拒绝普通编辑，并告诉模型**应该修改 IDL，再通过生成器更新代码**。检查不限定前五行，避免文件头的许可证注释把标记挤到后面。
+
+```bash
+#!/usr/bin/env bash
+# .claude/hooks/guard-generated.sh —— PreToolUse，matcher: Edit|Write
+
+file=$(jq -r '.tool_input.file_path // empty') || exit 2
+cd "$CLAUDE_PROJECT_DIR" || exit 2
+
+if [ -z "$file" ] || [ ! -f "$file" ]; then
+  exit 0
+fi
+
+if grep -qE '^// Code generated .* DO NOT EDIT\.$' "$file"; then
+  echo "拒绝修改生成文件：$file" >&2
+  echo "请修改对应的 IDL，然后执行代码生成命令重新生成。" >&2
+  exit 2
+fi
+```
+
+### 禁止使用某些库
+
+**问题**：项目要求业务日志统一走自定义日志接口，方便外部采集器收集日志，但实际代码里混着 `slog`、框架自带的 Logger，还有第三方库默认向 stderr 输出的纯文本。它们不一定带请求标识，格式也不统一，导致同一个请求的日志无法串起来。只拦截 `go get` 显然不够：`log/slog` 本来就在标准库里，模型甚至可以不加任何依赖，直接写 `fmt.Println`。
+
+**设计**：在 golangci-lint 中把约束拆成两层：`depguard` 拦不该出现的 **import**，`forbidigo` 拦不该出现的**调用或引用**。例如，`zap` 仍可用于构造结构化字段，但不能在业务代码里另建一个 Logger，也不能绕过日志门面直接写标准输出。所以这里设计日志输出统一使用 `logging.FromContext(ctx)`。`internal/logging/` 负责初始化，`internal/telemetry/` 只允许接入日志库，不允许新建 Logger。
+
+```yaml
+# backend/.golangci.yml，节选
+version: "2"
+linters:
+  enable:
+    - depguard
+    - forbidigo
+  settings:
+    depguard:
+      rules:
+        one-logger:
+          list-mode: lax
+          files:
+            - $all
+            - "!$test"
+            - "!**/internal/logging/**"
+            - "!**/internal/telemetry/**"
+            - "!**/scripts/**"
+          deny:
+            - pkg: log$
+              desc: 业务日志统一通过 logging.FromContext(ctx)
+            - pkg: log/slog
+              desc: 业务日志统一通过 logging.FromContext(ctx)
+            - pkg: github.com/cloudwego/hertz/pkg/common/hlog
+              desc: 框架日志由 internal/logging 统一接入
+            - pkg: github.com/sirupsen/logrus
+              desc: 业务日志统一通过 logging.FromContext(ctx)
+    forbidigo:
+      forbid:
+        - pattern: ^zap\.(New|NewProduction|NewDevelopment|NewExample|NewNop|Must)$
+          msg: Logger 只在 internal/logging 中初始化
+        - pattern: ^zap\.(L|S|ReplaceGlobals|RedirectStdLog|RedirectStdLogAt)$
+          msg: 不得绕过项目日志门面使用或替换全局 Logger
+        - pattern: ^(fmt\.Print(f|ln)?|print|println)$
+          msg: 业务日志统一通过 logging.FromContext(ctx)
+        - pattern: ^os\.(Stdout|Stderr)$
+          msg: 不得绕过日志门面直接写标准输出或错误输出
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [forbidigo]
+      - path: ^internal/logging/
+        linters: [forbidigo]
+      - path: ^scripts/
+        linters: [forbidigo]
+```
+
+### 确保前后端端点参数一致
+
+**问题**：前端的类型、Mock 与后端的响应可以各自正确，却彼此不一致：前端按自己假设的字段造 Mock，后端按自己的结构体序列化，最后只有真正联调时才会发现字段读不到。端点路径也是一样，Coding Agent宣称的“已实现”，不代表它真的被实现了。
+
+**设计**：通过 OpenAPI 协议来确保前后端端点参数一致。Edit / Write 后先按路径筛选：只有修改了后端 IDL / 实现，或前端的 API / 类型声明 / Mock，才检查 OpenAPI 是否与 proto 同步，再检查跨语言契约。任一步失败，诊断都写入 stderr，并以退出码 `2` 反馈给模型修复。
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-contract.sh",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+```bash
+#!/usr/bin/env bash
+# .claude/hooks/check-contract.sh —— PostToolUse，matcher: Edit|Write
+
+file=$(jq -r '.tool_input.file_path // empty') || exit 2
+file=${file#"$CLAUDE_PROJECT_DIR"/}
+
+# 只关注可能影响OpenAPI端点的文件
+case "$file" in
+  backend/idl/*.proto | backend/internal/*.go | \
+  frontend/src/api/* | frontend/src/types/* | frontend/src/mocks/*)
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+
+cd "$CLAUDE_PROJECT_DIR" || exit 2
+
+# 失败时将诊断写入 stderr，以退出码 2 反馈给模型
+{
+  make check-openapi &&
+    make test-contract
+} >&2 || exit 2
+```
+
+### 代码自动审计
+
+**问题**：测试和 Lint 没问题不代表实现符合需求，也不代表没有重复代码或过度设计。
+
+**设计**：Hook 固定审查时机，Skill / Agent 负责审查方法。可以将 Matt Pocock 的 [code-review Skill](https://github.com/mattpocock/skills/tree/main/skills/engineering/code-review) 与 Anthropic 的 `code-simplifier` Agent 接到 **PreToolUse（Bash）** 中来自动化审查流程，但Shell Hook 不会直接执行当前会话的 Skill，所以这里通过拒绝反馈把任务交回主 Agent。例如，推送前的反馈可以是：
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "当前待推送差异尚未完成 code-review。请先审查并修复问题，再由审查流程记录与当前内容对应的结果，然后重试 git push。"
+  }
+}
+```
+
+但这里需要注意的一点是Agent Reviewer可能无限地让彼此忙下去。Anthropic 记录过一个 PR 在一夜之间经历了五十多轮 Review 和修复，直到作者手动叫停。对 Reviewer 反复标记的代码做 `git blame` 后发现，大约 59% 是在第一轮 Review 时就已经存在的代码：Reviewer 几乎没有发现新的 Bug，只是每一轮多找出几个老问题。
+
+所以我们也可以设置一些简单指标来避免Reviewer不收敛的问题：
+- **轮次上限**：三轮之后，Reviewer 要求退一步重新考虑方案。
+- **只 Review 新的 Diff**：前几轮之后只 Review 新的 Diff。
+- **标记问题的类别**：让作者一次修复所有同类问题。
+- **不重复**已经提过的问题。
+
+## 后记
+
+实际在编程过程中，Hooks也并不是银弹，它只是可以将非确定性的东西变成确定性的东西，即一套完整健全的Lifecycle可以帮助Coding Agent根据你的自然语言需求自主完成长距离且可用的交付，但是部分在所谓taste方面的问题我个人认为还是需要人类来指出。
+
+例如：OpenAI系的模型饱受诟病的一点就是过度防御，即编写不必要的兜底代码或对边界进行过分的假设，Hooks的帮助相对有限。因为它在业务上是完全正确的。只是有很多冗余的业务逻辑，我们并不能说它不遵守软件工程的规范，而是它过度遵守了。
+
+我常会讲在Coding中或者在Engineering中，实际很多问题都是trade-off的艺术，如果你想让Coding Agent去自主的交付一个完整的业务，那么你可能需要在一些方面做出妥协，比如代码的风格、代码的组织方式等。我们可以把治理环节放在后面，先让功能可用也未尝不可。

@@ -1,0 +1,285 @@
+---
+title: Educational Codeforces Round 129 (Rated for Div. 2)
+pubDatetime: 2022-05-26T14:11:09+08:00
+slug: Educational-Codeforces-Round-129-Rated-for-Div-2
+legacyPath: 2022/05/26/Educational-Codeforces-Round-129-Rated-for-Div-2
+categories:
+  - CodeForces
+  - 算法学习
+description: Educational Codeforces Round 129 A–D 题解与 C++ 代码。
+tags:
+  - CodeForces
+  - 贪心
+  - 搜索
+  - 算法学习
+---
+
+## 目录
+
+## A.Game with Cards
+
+### 题目解析
+
+直接判断双方最大的手牌。如果最大的手牌比对方大，则对方无牌可出获得胜利
+
+### Code
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+#define ll long long
+#define endl "\n"
+#define lowbit(x) ((-(x))&(x))
+const double eps = 1e-6;
+const int INF = 0x3f3f3f3f;
+
+const int MAX=100;
+int n,m;
+
+void solve(){
+    int a[3][MAX];
+    
+    scanf("%d",&n);
+    for(int i=1;i<=n;i++) scanf("%d",&a[1][i]);
+    scanf("%d",&m);
+    for(int i=1;i<=m;i++) scanf("%d",&a[2][i]);
+    
+    sort(a[1]+1,a[1]+1+n);
+    sort(a[2]+1,a[2]+1+m);
+    
+    if(a[1][n]>=a[2][m]) cout << "Alice" << endl;
+    else cout << "Bob" << endl;
+    
+    if(a[1][n]<=a[2][m]) cout << "Bob" << endl;
+    else cout << "Alice" << endl;
+
+}
+
+
+int main(void)
+{
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(0);
+    std::cout.tie(0);
+    int T;
+    scanf("%d",&T);
+    while(T--){
+        solve();
+    }
+
+    return 0;
+}
+
+```
+
+## B. Card Trick
+
+### 题目解析
+
+循环队列思想。每次洗牌只需对数组的头进行运算即可得出结果
+
+### Code
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+#define ll long long
+#define endl "\n"
+#define lowbit(x) ((-(x))&(x))
+const double eps = 1e-6;
+const int INF = 0x3f3f3f3f;
+
+const int MAX=2*1e5+10;
+vector<ll> v(MAX),a(MAX);
+
+void solve(){
+    // deque<ll> d;
+    ll n,m,x;
+    
+    scanf("%lld",&n);
+    for(int i=1;i<=n;i++) scanf("%lld",&a[i]);
+    scanf("%lld",&m);
+    for(int i=1;i<=m;i++) scanf("%lld",&v[i]);
+    
+    int hh=0;
+    for(int i=1;i<=m;i++) hh=(hh+v[i])%n;
+    printf("%lld\n",a[hh+1]);
+
+}
+
+int main(void)
+{
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(0);
+    std::cout.tie(0);
+
+    int T;
+    scanf("%d",&T);
+    while(T--){
+        solve();
+    }
+    
+
+    return 0;
+}
+```
+
+## C. Double Sort
+
+### 题目解析
+
+如果两组数需要排序，则将他们的位置交换。在最后检查他们是否是有序的即可
+
+### Code
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+#define ll long long
+#define endl "\n"
+#define lowbit(x) ((-(x))&(x))
+const double eps = 1e-6;
+const int INF = 0x3f3f3f3f;
+
+const int MAX=110;
+ll n,a[MAX],b[MAX];
+
+void solve(){
+    vector<pair<ll,ll>> pii;
+
+    scanf("%lld",&n);
+    for(int i=1;i<=n;i++) scanf("%lld",&a[i]);
+    for(int i=1;i<=n;i++) scanf("%lld",&b[i]);
+    
+    for(int i=1;i<=n;i++){
+        for(int j=i;j<=n;j++){
+            if(a[i]>a[j]||b[i]>b[j]){
+                swap(a[i],a[j]);
+                swap(b[i],b[j]);
+                pii.push_back({i,j});
+            }
+        }
+    }
+    bool chk=true;
+    for(int i=1;i<=n;i++){
+        if(a[i-1]>a[i]||b[i-1]>b[i])
+            chk=false;
+    }
+    if(chk){
+        printf("%lld\n",(ll)pii.size());
+        for(auto const& x:pii){
+            printf("%lld %lld\n",x.first,x.second);
+        }
+    }
+    else{
+        printf("-1\n");
+    }
+
+    return;
+}
+
+int main(void)
+{
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(0);
+    std::cout.tie(0);
+
+    int T;
+    scanf("%d",&T);
+    
+    while(T--){
+        solve();
+    }
+
+    return 0;
+}
+```
+
+## D.Required Length
+
+### 题目解析
+
+暴力搜索即可。利用map来存储访问过的数字，为了加速搜索过程可以先将较大的数位放入队列
+
+### Code
+
+```cpp
+#include <bits/stdc++.h>
+#include <string>
+
+using namespace std;
+
+#define ll long long
+#define ull unsigned long long
+#define endl "\n"
+#define lowbit(x) ((-(x))&(x))
+const double eps = 1e-6;
+const int INF = 0x3f3f3f3f;
+
+ll n,x;
+const ull base = 10;
+
+struct node{
+    ull g;
+    ll steps=0;
+};
+
+bool cmp(int a,int b){
+    return a>b;
+}
+
+ll getd(ull x){
+    int res;
+    for(res=0;x;x/=base,res++);
+
+    return res;
+}
+
+void solve(){
+    scanf("%lld %lld",&n,&x);
+    
+    ll ans=-1;
+    queue<node> q;
+    map<ull,int> mp;
+
+    node t = {(ull)x,0};
+    q.push(t);
+    while(!q.empty()){
+        t = q.front(); q.pop();
+        if(getd(t.g)>n||mp[t.g]||t.g==0) continue;
+        if(getd(t.g)==n){
+            ans=t.steps;
+            break;
+        }
+        mp[t.g]++;
+        ull tar = t.g;
+        vector<int> d;
+        for(;t.g;t.g/=base) d.push_back((int)(t.g%base));
+        sort(d.begin(),d.end(),cmp);
+
+        for(auto const& x:d){
+            node nt = {x*tar,t.steps+1}; 
+            q.push(nt);
+        }
+    }
+    printf("%lld\n",ans);
+    return;
+}
+
+int main(void)
+{
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(0);
+    std::cout.tie(0);
+
+    solve();
+
+    return 0;
+}
+```

@@ -1,0 +1,47 @@
+/* Register design tokens for Tailwind v4 */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-selection: var(--selection);
+  --color-selection-foreground: var(--selection-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --font-app: var(--font-google-sans-code);
+}
+
+/*
+ * Web tokens adapted from vauxe/hatsune-miku-theme (MIT; see licenses/).
+ * Source: https://github.com/vauxe/hatsune-miku-theme/blob/cccb4a416f8b0cc74e47b11ec0762647e9f4a9ad/ports/web/hatsune-miku-theme.css
+ * Snow Miku 2026 light / original dark; teal focus replaces pink by preference.
+ */
+
+/* Light theme values */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --background: #fefaf0; /* surface-page */
+  --foreground: #753826; /* text-primary */
+  --accent: #006679; /* link-default */
+  --selection: #3b97c040;
+  --selection-foreground: #753826;
+  --muted: #f5f0e2; /* surface-content */
+  --muted-foreground: #646a6d; /* text-secondary */
+  --border: #a4b2b9; /* border-subtle */
+  --field-border: #6f848e;
+}
+
+/* Dark theme values */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #141618;
+  --foreground: #dee8f2;
+  --accent: #84ccc8;
+  --selection: #81d4fa40;
+  --selection-foreground: #dee8f2;
+  --muted: #1a1f24;
+  --muted-foreground: #bdd7d9;
+  --border: #39c5bb15;
+  --field-border: #39c5bb;
+}
