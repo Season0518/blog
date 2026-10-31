@@ -333,7 +333,7 @@ cd "$CLAUDE_PROJECT_DIR" || exit 2
 
 ### 代码自动审计
 
-**问题**：测试和 Lint 没问题不代表实现符合需求，也不代表没有重复代码或过度设计。
+**问题**：单元测试只能检查逻辑上的问题，但死代码，安全漏洞，并发安全等问题往往不能通过静态测试发现，所以需要额外的AI Review。
 
 **设计**：Hook 固定审查时机，Skill / Agent 负责审查方法。可以将 Matt Pocock 的 [code-review Skill](https://github.com/mattpocock/skills/tree/main/skills/engineering/code-review) 与 Anthropic 的 `code-simplifier` Agent 接到 **PreToolUse（Bash）** 中来自动化审查流程，但Shell Hook 不会直接执行当前会话的 Skill，所以这里通过拒绝反馈把任务交回主 Agent。例如，推送前的反馈可以是：
 
